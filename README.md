@@ -55,9 +55,14 @@ Every later push to `main` redeploys automatically — no further setup needed.
 This adds shared favorites. It's entirely optional — leave the Supabase fields
 in `config.js` empty and the site works exactly as before.
 
-1. Create a free project at <https://supabase.com>.
-2. Open **SQL Editor → New query**, paste the contents of
-   [`supabase/schema.sql`](supabase/schema.sql), and run it.
+1. Create a free project at <https://supabase.com>. Keep **Enable Data API** on;
+   pick a **region close to you** (it can't be changed later).
+2. Apply the database schema, either way:
+   - **Auto (GitHub connected):** set `project_id` in
+     [`supabase/config.toml`](supabase/config.toml) to your project ref and push
+     — Supabase deploys [`supabase/migrations/`](supabase/migrations/) for you.
+   - **Manual:** open **SQL Editor → New query**, paste the contents of the file
+     in [`supabase/migrations/`](supabase/migrations/), and run it.
 3. In **Project Settings → API**, copy the **Project URL** and the **anon
    public** key into `config.js`:
 
@@ -108,7 +113,8 @@ python3 -m http.server 8000
   Trakt (paginated), sorts by `listed_at`, and renders cards using the poster
   URLs Trakt returns inline. Handles favorites, ordering and the admin panel.
 - `store.js` — thin client for the Supabase RPC functions (favorites/devices).
-- `supabase/schema.sql` — the database schema + access-control functions.
+- `supabase/migrations/` — the database schema + access-control functions
+  (deployed automatically when GitHub is connected).
 - `styles.css` — dark, responsive card grid.
 
 No build step. The base watchlist needs no backend; favorites are an opt-in

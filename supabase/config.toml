@@ -1,0 +1,12 @@
+# Supabase project config.
+#
+# Set project_id to your project "ref" — the xxxx in https://xxxx.supabase.co
+# (Project Settings → General → Reference ID). With GitHub connected, pushing to
+# main then deploys everything in supabase/migrations/ automatically.
+#
+# If Supabase opens its own PR adding/expanding this file, just merge it.
+
+project_id = "your-project-ref"
+
+[db]
+major_version = 16
