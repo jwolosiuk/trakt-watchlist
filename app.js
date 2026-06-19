@@ -273,14 +273,10 @@
         '" aria-label="Favorite">♥</button>'
       : "";
 
-    // Reorder controls (admin, Picks tier). Drag the card, or use the arrows.
+    // Drag handle for reordering picks (admin, Picks tier).
     var reorder = reorderable
-      ? '<div class="reorder">' +
-        '<button class="reorder-btn" type="button" data-move="-1" data-key="' +
-        escapeHtml(k) + '" title="Move earlier" aria-label="Move earlier">‹</button>' +
-        '<button class="reorder-btn" type="button" data-move="1" data-key="' +
-        escapeHtml(k) + '" title="Move later" aria-label="Move later">›</button>' +
-        "</div>"
+      ? '<button class="drag-handle" type="button" aria-label="Drag to reorder" ' +
+        'title="Drag to reorder">⠿</button>'
       : "";
 
     return (
@@ -364,7 +360,7 @@
       var reorderable = canReorder && rank(item) === 0;
       html +=
         '<li class="card' +
-        (reorderable ? ' is-pick" draggable="true" data-key="' + escapeHtml(keyOf(item)) : "") +
+        (reorderable ? ' is-pick" data-key="' + escapeHtml(keyOf(item)) : "") +
         '">' +
         cardMarkup(item, reorderable) +
         "</li>";
@@ -439,46 +435,16 @@
       });
     }
 
-    // Favorite toggle + reorder arrows (event-delegated on the grid).
+    // Favorite toggle (event-delegated on the grid).
     els.grid.addEventListener("click", function (e) {
       var fav = e.target.closest(".fav-btn");
-      if (fav) {
-        e.preventDefault();
-        toggleFavorite(fav.getAttribute("data-key"), fav);
-        return;
-      }
-      var rb = e.target.closest(".reorder-btn");
-      if (rb) {
-        e.preventDefault();
-        movePickBy(rb.getAttribute("data-key"), parseInt(rb.getAttribute("data-move"), 10));
-      }
+      if (!fav) return;
+      e.preventDefault();
+      toggleFavorite(fav.getAttribute("data-key"), fav);
     });
 
-    // Drag-to-reorder picks (desktop).
-    els.grid.addEventListener("dragstart", function (e) {
-      var li = e.target.closest("li.is-pick");
-      if (!li) return;
-      state.dragKey = li.getAttribute("data-key");
-      li.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      try { e.dataTransfer.setData("text/plain", state.dragKey); } catch (_) {}
-    });
-    els.grid.addEventListener("dragover", function (e) {
-      if (!state.dragKey || !e.target.closest("li.is-pick")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-    });
-    els.grid.addEventListener("drop", function (e) {
-      var li = state.dragKey && e.target.closest("li.is-pick");
-      if (!li) return;
-      e.preventDefault();
-      movePickBefore(state.dragKey, li.getAttribute("data-key"));
-    });
-    els.grid.addEventListener("dragend", function () {
-      state.dragKey = null;
-      var d = els.grid.querySelector(".dragging");
-      if (d) d.classList.remove("dragging");
-    });
+    // Pointer-based drag-to-reorder picks (works with mouse + touch).
+    wireReorderDrag();
 
     // Favorites filter toggle ("♥ Mine", or clears an active device filter).
     if (els.favFilter) {
@@ -668,31 +634,62 @@
     });
   }
 
-  function movePickBy(k, delta) {
-    var arr = state.pickKeys.slice();
-    var i = arr.indexOf(k);
-    if (i < 0) return;
-    var j = i + delta;
-    if (j < 0 || j >= arr.length) return;
-    arr.splice(i, 1);
-    arr.splice(j, 0, k);
-    applyPickKeys(arr);
-    renderGrid();
-    persistPickOrder();
-  }
+  // Reorder picks by dragging the handle. Reorders the DOM live, then saves the
+  // resulting order on release. Uses Pointer Events so it works on touch too.
+  function wireReorderDrag() {
+    var drag = null;
 
-  function movePickBefore(fromKey, toKey) {
-    if (fromKey === toKey) return;
-    var arr = state.pickKeys.slice();
-    var fi = arr.indexOf(fromKey);
-    if (fi < 0) return;
-    arr.splice(fi, 1);
-    var ti = arr.indexOf(toKey);
-    if (ti < 0) ti = arr.length;
-    arr.splice(ti, 0, fromKey);
-    applyPickKeys(arr);
-    renderGrid();
-    persistPickOrder();
+    function pickCardFromPoint(x, y) {
+      var el = document.elementFromPoint(x, y);
+      return el && el.closest ? el.closest("li.is-pick") : null;
+    }
+
+    els.grid.addEventListener("pointerdown", function (e) {
+      var handle = e.target.closest && e.target.closest(".drag-handle");
+      if (!handle) return;
+      var li = handle.closest("li.is-pick");
+      if (!li) return;
+      e.preventDefault();
+      drag = { li: li, pointerId: e.pointerId, moved: false };
+      li.classList.add("dragging");
+      // Capture on the grid (not the card) so the dragged card can be
+      // pointer-events:none for hit-testing without losing the capture.
+      try { els.grid.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    els.grid.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      e.preventDefault();
+      var target = pickCardFromPoint(e.clientX, e.clientY);
+      if (!target || target === drag.li) return;
+      drag.moved = true;
+      var rect = target.getBoundingClientRect();
+      var after = els.grid.classList.contains("as-list")
+        ? e.clientY > rect.top + rect.height / 2
+        : e.clientX > rect.left + rect.width / 2;
+      target.parentNode.insertBefore(drag.li, after ? target.nextSibling : target);
+    });
+
+    function endDrag(e) {
+      if (!drag || (e && e.pointerId !== drag.pointerId)) return;
+      var d = drag;
+      drag = null;
+      d.li.classList.remove("dragging");
+      try { els.grid.releasePointerCapture(d.pointerId); } catch (_) {}
+      if (!d.moved) return;
+      // Read the new pick order straight from the DOM.
+      var keys = [];
+      Array.prototype.forEach.call(
+        els.grid.querySelectorAll("li.is-pick"),
+        function (li) { keys.push(li.getAttribute("data-key")); }
+      );
+      applyPickKeys(keys);
+      persistPickOrder();
+      renderGrid();
+    }
+
+    els.grid.addEventListener("pointerup", endDrag);
+    els.grid.addEventListener("pointercancel", endDrag);
   }
 
   function openAdmin() {
