@@ -38,14 +38,14 @@ window.CONFIG = {
 
 Commit and push. Posters are pulled directly from Trakt — no other key needed.
 
-### 4. GitHub Pages
+### 4. Enable GitHub Pages (one-time)
 
-A workflow at `.github/workflows/pages.yml` deploys the site to GitHub Pages on
-every push to `main` (it enables Pages automatically the first time it runs).
-Your site is published at `https://<username>.github.io/trakt-watchlist/`.
+In the repo on GitHub go to **Settings → Pages → Build and deployment**, set
+**Source: Deploy from a branch**, choose branch `main` and folder `/ (root)`,
+then **Save**. After a minute the site is live at
+`https://<username>.github.io/trakt-watchlist/`.
 
-If you'd rather not use Actions, you can instead go to
-**Settings → Pages → Deploy from a branch**, choose `main` / `/ (root)`.
+Every later push to `main` redeploys automatically — no further setup needed.
 
 ## Running locally
 
