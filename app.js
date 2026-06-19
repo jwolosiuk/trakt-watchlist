@@ -442,6 +442,7 @@
         alert("Couldn't save that favorite — please try again.");
       })
       .then(function () {
+        updateBackendUI();
         renderGrid();
       });
   }
@@ -495,10 +496,33 @@
     return s;
   }
 
-  function setupBackendUI() {
+  // Reveal the admin button to non-admins only when a setup hint is in the URL
+  // (e.g. open ".../#setup" once to grab a new device's id for bootstrapping).
+  var SETUP_MODE = /setup|admin|device/i.test(
+    (location.hash || "") + " " + (location.search || "")
+  );
+
+  function hasMyFavs() {
+    for (var k in state.myFavs) {
+      if (state.myFavs[k]) return true;
+    }
+    return false;
+  }
+
+  // "♥ Mine" only matters once this device has favorited something; the admin
+  // button is admin-only (plus the setup escape hatch).
+  function updateBackendUI() {
     if (!Store.enabled) return;
-    if (els.favFilter) els.favFilter.hidden = false;
-    if (els.adminBtn) els.adminBtn.hidden = false;
+    if (els.adminBtn) els.adminBtn.hidden = !(Store.isAdmin || SETUP_MODE);
+    if (els.favFilter) {
+      var showMine = Store.isAdmin || hasMyFavs();
+      els.favFilter.hidden = !showMine;
+      if (!showMine && state.favView === "mine") setFavView(null);
+    }
+  }
+
+  function setupBackendUI() {
+    updateBackendUI();
   }
 
   function loadFavorites() {
@@ -507,6 +531,7 @@
       function (res) {
         state.myFavs = res[0] || {};
         state.adminFavs = res[1] || {};
+        updateBackendUI();
         renderGrid();
       }
     );
