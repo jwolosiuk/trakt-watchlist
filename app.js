@@ -293,6 +293,12 @@
     });
   }
 
+  function groupHeader(r) {
+    if (r === 0) return '<li class="group-sep picks">★ Picks</li>';
+    if (r === 1) return '<li class="group-sep mine">♥ Your favorites</li>';
+    return '<li class="group-sep rest">Rest of the watchlist</li>';
+  }
+
   function renderGrid() {
     var items = visibleItems();
     if (!items.length) {
@@ -304,11 +310,31 @@
       return;
     }
     setStatus("", false);
-    els.grid.innerHTML = items
-      .map(function (item) {
-        return '<li class="card">' + cardMarkup(item) + "</li>";
-      })
-      .join("");
+
+    // Group headers (Picks / Your favorites / Rest) only when browsing the full
+    // list AND more than one tier is actually present.
+    var grouped = false;
+    if (!favViewSet()) {
+      var seen = {};
+      items.forEach(function (it) {
+        seen[rank(it)] = true;
+      });
+      grouped = Object.keys(seen).length > 1;
+    }
+
+    var html = "";
+    var lastRank = -1;
+    items.forEach(function (item) {
+      if (grouped) {
+        var r = rank(item);
+        if (r !== lastRank) {
+          html += groupHeader(r);
+          lastRank = r;
+        }
+      }
+      html += '<li class="card">' + cardMarkup(item) + "</li>";
+    });
+    els.grid.innerHTML = html;
   }
 
   function renderSkeletons(n) {

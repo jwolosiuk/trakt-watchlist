@@ -377,6 +377,30 @@ a { color: inherit; }
 .badge.pin { background: #f5c518; color: #1a1a1a; }
 .kind-pin { color: #f5c518; }
 
+/* Group separators (Picks / Your favorites / Rest) ------------------------ */
+.group-sep {
+  grid-column: 1 / -1;
+  list-style: none;
+  margin: 22px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.group-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.group-sep.picks { color: #f5c518; }
+.group-sep.mine { color: var(--accent); }
+.grid > .group-sep:first-child { margin-top: 0; }
+
 .grid.as-list .fav-btn { top: 50%; transform: translateY(-50%); right: 10px; }
 .grid.as-list .fav-btn:hover { transform: translateY(-50%) scale(1.12); }
 
