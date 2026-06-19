@@ -40,15 +40,19 @@
     view: readView(), // grid | list
     myFavs: {},       // "type:id" -> true (this device's favorites)
     adminFavs: {},    // "type:id" -> true (admin pins, shown for everyone)
+    pickKeys: [],     // ordered "type:id" of admin pins
+    pickOrder: {},    // "type:id" -> index within pickKeys
+    dragKey: null,    // pick currently being dragged
     // Favorites filter: null | "mine" | { deviceId, name, favs }
     favView: null,
   };
 
   function readView() {
+    // List is the default; only an explicit saved "grid" overrides it.
     try {
-      return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid";
+      return localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "list";
     } catch (e) {
-      return "grid";
+      return "list";
     }
   }
 
@@ -189,8 +193,9 @@
   }
 
   // Which favorites-set (if any) the current favView restricts the list to.
+  // For an admin, "mine" means the shared Picks; for visitors it's their own.
   function favViewSet() {
-    if (state.favView === "mine") return state.myFavs;
+    if (state.favView === "mine") return Store.isAdmin ? state.adminFavs : state.myFavs;
     if (state.favView && state.favView.favs) return state.favView.favs;
     return null;
   }
@@ -203,12 +208,19 @@
       return true;
     });
 
-    // Pin admin favorites first, then this device's own favorites, then the
-    // rest — each group keeps the date-added order. Skip when already viewing a
-    // single favorites set (the list is small and self-explanatory then).
+    // Pin admin favorites first (in their saved order), then this device's own
+    // favorites, then the rest. Other tiers keep the date-added order (sort is
+    // stable). Skip when viewing a single favorites set.
     if (!favSet) {
       items.sort(function (a, b) {
-        return rank(a) - rank(b);
+        var ra = rank(a), rb = rank(b);
+        if (ra !== rb) return ra - rb;
+        if (ra === 0) {
+          var pa = state.pickOrder[keyOf(a)];
+          var pb = state.pickOrder[keyOf(b)];
+          return (pa == null ? 1e9 : pa) - (pb == null ? 1e9 : pb);
+        }
+        return 0;
       });
     }
     return items;
@@ -223,7 +235,7 @@
     return 2;
   }
 
-  function cardMarkup(item) {
+  function cardMarkup(item, reorderable) {
     var k = keyOf(item);
     var kindLabel = item.type === "movie" ? "Movie" : "Series";
     var pinned = Store.enabled && state.adminFavs[k];
@@ -243,29 +255,45 @@
       .join(" · ");
 
     // Favorite toggle (only when the backend is configured). Sits outside the
-    // poster link so clicking it doesn't open Trakt.
+    // poster link so clicking it doesn't open Trakt. For admins it toggles the
+    // shared Pick; for visitors, their own favorite.
+    var faved = Store.isAdmin ? pinned : mine;
+    var favTitle = Store.isAdmin
+      ? (faved ? "Remove from Picks" : "Add to Picks")
+      : (faved ? "Remove from my favorites" : "Add to my favorites");
     var favBtn = Store.enabled && item.traktId
       ? '<button class="fav-btn' +
-        (mine ? " is-fav" : "") +
+        (faved ? " is-fav" : "") +
         '" type="button" data-key="' +
         escapeHtml(k) +
         '" aria-pressed="' +
-        (mine ? "true" : "false") +
+        (faved ? "true" : "false") +
         '" title="' +
-        (mine ? "Remove from my favorites" : "Add to my favorites") +
+        favTitle +
         '" aria-label="Favorite">♥</button>'
+      : "";
+
+    // Reorder controls (admin, Picks tier). Drag the card, or use the arrows.
+    var reorder = reorderable
+      ? '<div class="reorder">' +
+        '<button class="reorder-btn" type="button" data-move="-1" data-key="' +
+        escapeHtml(k) + '" title="Move earlier" aria-label="Move earlier">‹</button>' +
+        '<button class="reorder-btn" type="button" data-move="1" data-key="' +
+        escapeHtml(k) + '" title="Move later" aria-label="Move later">›</button>' +
+        "</div>"
       : "";
 
     return (
       favBtn +
-      '<a class="poster-link" href="' +
+      reorder +
+      '<a class="poster-link" draggable="false" href="' +
       escapeHtml(item.traktUrl) +
       '" target="_blank" rel="noopener" title="' +
       escapeHtml(item.title) +
       ' on Trakt">' +
       '<div class="poster">' +
       '<div class="badges">' + badges + "</div>" +
-      posterInner +
+      posterInner.replace("<img ", '<img draggable="false" ') +
       "</div>" +
       '<div class="card-body">' +
       // Shown only in list view (badges cover this in grid view).
@@ -322,6 +350,7 @@
       grouped = Object.keys(seen).length > 1;
     }
 
+    var canReorder = Store.isAdmin && !favViewSet();
     var html = "";
     var lastRank = -1;
     items.forEach(function (item) {
@@ -332,7 +361,13 @@
           lastRank = r;
         }
       }
-      html += '<li class="card">' + cardMarkup(item) + "</li>";
+      var reorderable = canReorder && rank(item) === 0;
+      html +=
+        '<li class="card' +
+        (reorderable ? ' is-pick" draggable="true" data-key="' + escapeHtml(keyOf(item)) : "") +
+        '">' +
+        cardMarkup(item, reorderable) +
+        "</li>";
     });
     els.grid.innerHTML = html;
   }
@@ -404,18 +439,51 @@
       });
     }
 
-    // Favorite toggle (event-delegated on the grid).
+    // Favorite toggle + reorder arrows (event-delegated on the grid).
     els.grid.addEventListener("click", function (e) {
-      var btn = e.target.closest(".fav-btn");
-      if (!btn) return;
-      e.preventDefault();
-      toggleFavorite(btn.getAttribute("data-key"), btn);
+      var fav = e.target.closest(".fav-btn");
+      if (fav) {
+        e.preventDefault();
+        toggleFavorite(fav.getAttribute("data-key"), fav);
+        return;
+      }
+      var rb = e.target.closest(".reorder-btn");
+      if (rb) {
+        e.preventDefault();
+        movePickBy(rb.getAttribute("data-key"), parseInt(rb.getAttribute("data-move"), 10));
+      }
     });
 
-    // "♥ Mine" filter.
+    // Drag-to-reorder picks (desktop).
+    els.grid.addEventListener("dragstart", function (e) {
+      var li = e.target.closest("li.is-pick");
+      if (!li) return;
+      state.dragKey = li.getAttribute("data-key");
+      li.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", state.dragKey); } catch (_) {}
+    });
+    els.grid.addEventListener("dragover", function (e) {
+      if (!state.dragKey || !e.target.closest("li.is-pick")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    });
+    els.grid.addEventListener("drop", function (e) {
+      var li = state.dragKey && e.target.closest("li.is-pick");
+      if (!li) return;
+      e.preventDefault();
+      movePickBefore(state.dragKey, li.getAttribute("data-key"));
+    });
+    els.grid.addEventListener("dragend", function () {
+      state.dragKey = null;
+      var d = els.grid.querySelector(".dragging");
+      if (d) d.classList.remove("dragging");
+    });
+
+    // Favorites filter toggle ("♥ Mine", or clears an active device filter).
     if (els.favFilter) {
       els.favFilter.addEventListener("click", function () {
-        setFavView(state.favView === "mine" ? null : "mine");
+        setFavView(state.favView ? null : "mine");
       });
     }
 
@@ -443,42 +511,52 @@
 
   // --- Favorites ----------------------------------------------------------
 
+  // For an admin the heart toggles the shared Picks; for a visitor, their own
+  // favorites. The server (set_favorite) routes by admin status as well.
   function toggleFavorite(k, btn) {
     if (!Store.enabled || !k) return;
     var item = state.byKey[k];
     if (!item) return;
-    var on = !state.myFavs[k];
+    var admin = Store.isAdmin;
+    var on = admin ? !state.adminFavs[k] : !state.myFavs[k];
+
     // Optimistic update.
-    if (on) state.myFavs[k] = true;
-    else delete state.myFavs[k];
+    if (admin) {
+      var i = state.pickKeys.indexOf(k);
+      if (on && i < 0) state.pickKeys.push(k); // new picks append
+      if (!on && i >= 0) state.pickKeys.splice(i, 1);
+      applyPickKeys(state.pickKeys);
+    } else {
+      if (on) state.myFavs[k] = true;
+      else delete state.myFavs[k];
+    }
     if (btn) btn.disabled = true;
-    Store.setFavorite(item, on)
-      .then(function () {
-        // If this device is an admin, its picks are the public pins too.
-        if (Store.isAdmin) {
-          if (on) state.adminFavs[k] = true;
-          else delete state.adminFavs[k];
-        }
-      })
-      .catch(function (err) {
-        console.error("setFavorite failed:", err);
-        // Roll back.
+    updateBackendUI();
+    renderGrid();
+
+    Store.setFavorite(item, on).catch(function (err) {
+      console.error("setFavorite failed:", err);
+      alert("Couldn't save that — please try again.");
+      // Resync from the server.
+      if (admin) reloadAdminFavs();
+      else {
         if (on) delete state.myFavs[k];
         else state.myFavs[k] = true;
-        alert("Couldn't save that favorite — please try again.");
-      })
-      .then(function () {
         updateBackendUI();
         renderGrid();
-      });
+      }
+    });
   }
 
   function setFavView(view) {
     state.favView = view;
     if (els.favFilter) {
-      var mineActive = view === "mine";
-      els.favFilter.classList.toggle("is-active", mineActive);
-      els.favFilter.setAttribute("aria-pressed", mineActive ? "true" : "false");
+      var active = !!view;
+      els.favFilter.classList.toggle("is-active", active);
+      els.favFilter.setAttribute("aria-pressed", active ? "true" : "false");
+      // Reflect a device filter in the button label, like "Mine" does.
+      els.favFilter.textContent =
+        view && view.deviceId ? "♥ " + (view.name || shortId(view.deviceId)) : "♥ Mine";
     }
     renderBanner();
     renderGrid();
@@ -551,12 +629,23 @@
     updateBackendUI();
   }
 
+  // Rebuild the adminFavs lookup + pick index from the ordered pickKeys.
+  function applyPickKeys(keys) {
+    state.pickKeys = keys || [];
+    state.adminFavs = {};
+    state.pickOrder = {};
+    state.pickKeys.forEach(function (k, i) {
+      state.adminFavs[k] = true;
+      state.pickOrder[k] = i;
+    });
+  }
+
   function loadFavorites() {
     if (!Store.enabled) return Promise.resolve();
     return Promise.all([Store.myFavorites(), Store.adminFavorites()]).then(
       function (res) {
         state.myFavs = res[0] || {};
-        state.adminFavs = res[1] || {};
+        applyPickKeys(res[1] || []);
         updateBackendUI();
         renderGrid();
       }
@@ -564,10 +653,46 @@
   }
 
   function reloadAdminFavs() {
-    return Store.adminFavorites().then(function (s) {
-      state.adminFavs = s || {};
+    return Store.adminFavorites().then(function (keys) {
+      applyPickKeys(keys || []);
       renderGrid();
     });
+  }
+
+  // --- Reordering picks (admin) ------------------------------------------
+
+  function persistPickOrder() {
+    Store.reorderPicks(state.pickKeys.slice()).catch(function (err) {
+      console.error("reorder failed:", err);
+      reloadAdminFavs(); // resync from server on failure
+    });
+  }
+
+  function movePickBy(k, delta) {
+    var arr = state.pickKeys.slice();
+    var i = arr.indexOf(k);
+    if (i < 0) return;
+    var j = i + delta;
+    if (j < 0 || j >= arr.length) return;
+    arr.splice(i, 1);
+    arr.splice(j, 0, k);
+    applyPickKeys(arr);
+    renderGrid();
+    persistPickOrder();
+  }
+
+  function movePickBefore(fromKey, toKey) {
+    if (fromKey === toKey) return;
+    var arr = state.pickKeys.slice();
+    var fi = arr.indexOf(fromKey);
+    if (fi < 0) return;
+    arr.splice(fi, 1);
+    var ti = arr.indexOf(toKey);
+    if (ti < 0) ti = arr.length;
+    arr.splice(ti, 0, fromKey);
+    applyPickKeys(arr);
+    renderGrid();
+    persistPickOrder();
   }
 
   function openAdmin() {
@@ -663,13 +788,7 @@
       Store.admin
         .deviceFavorites(id)
         .then(function (rows) {
-          state.favView = { deviceId: id, name: name, favs: favsFromRows(rows) };
-          if (els.favFilter) {
-            els.favFilter.classList.remove("is-active");
-            els.favFilter.setAttribute("aria-pressed", "false");
-          }
-          renderBanner();
-          renderGrid();
+          setFavView({ deviceId: id, name: name, favs: favsFromRows(rows) });
           closeAdmin();
         })
         .catch(function (err) {

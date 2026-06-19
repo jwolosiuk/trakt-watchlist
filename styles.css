@@ -377,6 +377,35 @@ a { color: inherit; }
 .badge.pin { background: #f5c518; color: #1a1a1a; }
 .kind-pin { color: #f5c518; }
 
+/* Reorder controls on Pick cards (admin) */
+.is-pick { cursor: grab; }
+.is-pick.dragging { opacity: 0.4; }
+.reorder {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+.reorder-btn {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+.reorder-btn:hover { opacity: 1; background: var(--accent); }
+.grid.as-list .reorder { left: auto; right: 44px; bottom: 50%; transform: translateY(50%); }
+
 /* Group separators (Picks / Your favorites / Rest) ------------------------ */
 .group-sep {
   grid-column: 1 / -1;

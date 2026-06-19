@@ -103,14 +103,24 @@
         });
     },
 
-    // Map of "type:id" -> true for items any admin has favorited (public pins).
+    // Ordered list of "type:id" keys for items any admin favorited (the pins).
     adminFavorites: function () {
-      if (!this.enabled) return Promise.resolve({});
+      if (!this.enabled) return Promise.resolve([]);
       return rpc("admin_favorites", {})
-        .then(setFromRows)
+        .then(function (rows) {
+          return (rows || []).map(function (r) {
+            return key(r.media_type, r.trakt_id);
+          });
+        })
         .catch(function () {
-          return {};
+          return [];
         });
+    },
+
+    // Persist a new order for this device's favorites (array of "type:id").
+    reorderPicks: function (keys) {
+      if (!this.enabled) return Promise.reject(new Error("disabled"));
+      return rpc("reorder_favorites", { p_device: this.deviceId, p_keys: keys });
     },
 
     // Toggle a favorite for this device.
