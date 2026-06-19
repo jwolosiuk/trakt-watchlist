@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 window.CONFIG = {
-  TRAKT_USERNAME: "",
-  TRAKT_CLIENT_ID: "",
+  TRAKT_USERNAME: "dzeremi",
+  TRAKT_CLIENT_ID: "bd4ee4d974c1421a548413339a9588316b1c41f5a4ad678c7d7fb46f95bd5a7b",
   TMDB_API_KEY: "",
 };
