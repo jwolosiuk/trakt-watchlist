@@ -13,6 +13,10 @@
 
 * { box-sizing: border-box; }
 
+/* The hidden attribute must always win over class rules that set `display`
+   (e.g. .admin-panel / .filter-banner use display:flex). */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
