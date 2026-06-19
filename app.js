@@ -209,7 +209,12 @@
       });
       (res[1] || []).forEach(function (w) {
         var id = w.show && w.show.ids && w.show.ids.trakt;
-        if (id) map["show:" + id] = { plays: w.plays || 0, last: w.last_watched_at || "" };
+        if (!id) return;
+        var eps = 0; // distinct watched episodes (excluding specials/season 0)
+        (w.seasons || []).forEach(function (s) {
+          if (s.number >= 1) eps += (s.episodes || []).length;
+        });
+        map["show:" + id] = { plays: w.plays || 0, last: w.last_watched_at || "", episodes: eps };
       });
       return map;
     });
@@ -305,16 +310,30 @@
     var pinned = Store.enabled && state.adminFavs[k];
     var mine = Store.enabled && state.myFavs[k];
     var seen = state.watched[k];
+    // "Watching" while a show isn't finished; "Seen" once completed (even mid
+    // rewatch). Movies are always "Seen".
+    var watchBadge = "", watchKind = "";
+    if (seen) {
+      var inProgress =
+        item.type === "show" && item.episodes && seen.episodes < item.episodes;
+      if (inProgress) {
+        var wt = "Watched " + seen.episodes + "/" + item.episodes + " episodes";
+        watchBadge = '<span class="badge watching" title="' + escapeHtml(wt) + '">▶ Watching</span>';
+        watchKind = ' · <span class="kind-watching">▶ Watching</span>';
+      } else {
+        var label = item.type === "movie" && seen.plays > 1 ? "Seen ×" + seen.plays : "Seen";
+        var st = seen.last ? "Last watched " + seen.last.slice(0, 10) : "Already watched";
+        watchBadge = '<span class="badge seen" title="' + escapeHtml(st) + '">✓ ' + label + "</span>";
+        watchKind = ' · <span class="kind-seen">✓ ' + label + "</span>";
+      }
+    }
+
     var badges = "";
     if (pinned) badges += '<span class="badge pin" title="Pick">★</span>';
-    if (seen) {
-      var seenLabel = item.type === "movie" && seen.plays > 1 ? "Seen ×" + seen.plays : "Seen";
-      var seenTitle = seen.last ? "Last watched " + seen.last.slice(0, 10) : "Already watched";
-      badges += '<span class="badge seen" title="' + escapeHtml(seenTitle) + '">✓ ' + seenLabel + "</span>";
-    }
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
     else if (isAnimated(item)) badges += '<span class="badge animated">Animated</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
+    badges += watchBadge; // watched status goes last
     var posterInner = item.poster
       ? '<img src="' + escapeHtml(item.poster) + '" alt="" loading="lazy" />'
       : '<span class="placeholder">' + escapeHtml(item.title) + "</span>";
@@ -367,10 +386,10 @@
       // Shown only in list view (badges cover this in grid view).
       '<div class="card-kind">' +
       (pinned ? '<span class="kind-pin">★</span> ' : "") +
-      (seen ? '<span class="kind-seen">✓ Seen' + (item.type === "movie" && seen.plays > 1 ? " ×" + seen.plays : "") + "</span> · " : "") +
       (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
       (isAnimated(item) ? '<span class="kind-animated">Animated</span> · ' : "") +
       kindLabel +
+      watchKind +
       "</div>" +
       '<div class="card-title">' + escapeHtml(item.title) + "</div>" +
       '<div class="card-meta">' +
