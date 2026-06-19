@@ -1,14 +1,11 @@
 /* Public Trakt watchlist viewer — fetches the list client-side and renders it.
- * No login required for visitors; the owner's Trakt watchlist must be public. */
+ * No login required for visitors; the owner's Trakt watchlist must be public.
+ * Posters come straight from the Trakt API (extended=images). */
 (function () {
   "use strict";
 
   var CFG = window.CONFIG || {};
   var TRAKT_API = "https://api.trakt.tv";
-  var TMDB_API = "https://api.themoviedb.org/3";
-  var TMDB_IMG = "https://image.tmdb.org/t/p/w342";
-  var POSTER_CACHE_KEY = "trakt-wl-posters-v1";
-  var POSTER_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
   var els = {
     title: document.getElementById("title"),
@@ -45,23 +42,12 @@
     return (item.genres || []).indexOf("anime") !== -1;
   }
 
-  // --- Poster cache (localStorage) ---------------------------------------
-
-  function loadPosterCache() {
-    try {
-      var raw = localStorage.getItem(POSTER_CACHE_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function savePosterCache(cache) {
-    try {
-      localStorage.setItem(POSTER_CACHE_KEY, JSON.stringify(cache));
-    } catch (e) {
-      /* storage full / disabled — ignore */
-    }
+  // Trakt returns protocol-relative-ish paths like "media.trakt.tv/.../x.webp".
+  function fullImageUrl(arr) {
+    if (!arr || !arr.length || !arr[0]) return null;
+    var p = arr[0];
+    if (/^https?:\/\//.test(p)) return p;
+    return "https://" + p.replace(/^\/\//, "");
   }
 
   // --- Trakt --------------------------------------------------------------
@@ -74,8 +60,13 @@
     };
   }
 
-  // Fetch every page of the watchlist (movies + shows), with full extended
-  // info so we get genres and overview.
+  function makeError(code, message) {
+    var e = new Error(message);
+    e.code = code;
+    return e;
+  }
+
+  // Fetch every page of the watchlist (movies + shows) with full info + images.
   function fetchWatchlist() {
     var user = encodeURIComponent(CFG.TRAKT_USERNAME);
     var all = [];
@@ -85,7 +76,7 @@
         TRAKT_API +
         "/users/" +
         user +
-        "/watchlist?extended=full&limit=100&page=" +
+        "/watchlist?extended=full,images&limit=100&page=" +
         page;
       return fetch(url, { headers: traktHeaders() }).then(function (res) {
         if (res.status === 403 || res.status === 423) {
@@ -127,17 +118,12 @@
     return getPage(1);
   }
 
-  function makeError(code, message) {
-    var e = new Error(message);
-    e.code = code;
-    return e;
-  }
-
   // Turn a raw Trakt watchlist row into a flat item we can render.
   function normalize(row) {
     var type = row.type === "movie" ? "movie" : "show";
     var media = row[type] || {};
     var ids = media.ids || {};
+    var images = media.images || {};
     var slugType = type === "movie" ? "movies" : "shows";
     return {
       type: type, // "movie" | "show"
@@ -146,85 +132,11 @@
       year: media.year || null,
       genres: media.genres || [],
       overview: media.overview || "",
-      tmdb: ids.tmdb || null,
+      poster: fullImageUrl(images.poster),
       traktUrl: ids.slug
         ? "https://trakt.tv/" + slugType + "/" + ids.slug
         : "https://trakt.tv/users/" + encodeURIComponent(CFG.TRAKT_USERNAME) + "/watchlist",
     };
-  }
-
-  // --- TMDB posters -------------------------------------------------------
-
-  function tmdbConfigured() {
-    return !!(CFG.TMDB_API_KEY && CFG.TMDB_API_KEY.trim());
-  }
-
-  // v4 read-access tokens are JWTs (start with "eyJ"); v3 keys go in the query.
-  function tmdbFetch(path) {
-    var key = CFG.TMDB_API_KEY.trim();
-    var isBearer = /^eyJ/.test(key);
-    var url = TMDB_API + path;
-    var opts = {};
-    if (isBearer) {
-      opts.headers = { Authorization: "Bearer " + key };
-    } else {
-      url += (path.indexOf("?") === -1 ? "?" : "&") + "api_key=" + encodeURIComponent(key);
-    }
-    return fetch(url, opts).then(function (res) {
-      if (!res.ok) return null;
-      return res.json();
-    });
-  }
-
-  // Resolve poster paths for all items, using cache + a small concurrency pool.
-  function hydratePosters(items) {
-    if (!tmdbConfigured()) return Promise.resolve();
-
-    var cache = loadPosterCache();
-    var now = Date.now();
-    var queue = [];
-
-    items.forEach(function (item) {
-      if (!item.tmdb) return;
-      var cacheKey = item.type + ":" + item.tmdb;
-      var hit = cache[cacheKey];
-      if (hit && now - hit.t < POSTER_TTL_MS) {
-        item.poster = hit.p ? TMDB_IMG + hit.p : null;
-      } else {
-        queue.push({ item: item, cacheKey: cacheKey });
-      }
-    });
-
-    if (!queue.length) return Promise.resolve();
-
-    var index = 0;
-    var CONCURRENCY = 6;
-    var dirty = false;
-
-    function worker() {
-      if (index >= queue.length) return Promise.resolve();
-      var job = queue[index++];
-      var endpoint =
-        (job.item.type === "movie" ? "/movie/" : "/tv/") + job.item.tmdb;
-      return tmdbFetch(endpoint)
-        .then(function (data) {
-          var path = data && data.poster_path ? data.poster_path : null;
-          job.item.poster = path ? TMDB_IMG + path : null;
-          cache[job.cacheKey] = { p: path, t: now };
-          dirty = true;
-        })
-        .catch(function () {})
-        .then(function () {
-          renderCard(job.item); // progressive update
-          return worker();
-        });
-    }
-
-    var workers = [];
-    for (var i = 0; i < CONCURRENCY; i++) workers.push(worker());
-    return Promise.all(workers).then(function () {
-      if (dirty) savePosterCache(cache);
-    });
   }
 
   // --- Rendering ----------------------------------------------------------
@@ -245,10 +157,6 @@
     return state.items.filter(function (it) {
       return matchesFilter(it) && matchesQuery(it);
     });
-  }
-
-  function cardId(item) {
-    return "card-" + item.type + "-" + (item.tmdb || item.title.replace(/\W+/g, "-"));
   }
 
   function cardMarkup(item) {
@@ -283,12 +191,6 @@
     );
   }
 
-  // Update a single card in place (used when its poster resolves later).
-  function renderCard(item) {
-    var li = document.getElementById(cardId(item));
-    if (li) li.innerHTML = cardMarkup(item);
-  }
-
   function renderGrid() {
     var items = visibleItems();
     if (!items.length) {
@@ -302,11 +204,7 @@
     setStatus("", false);
     els.grid.innerHTML = items
       .map(function (item) {
-        return (
-          '<li class="card" id="' + cardId(item) + '">' +
-          cardMarkup(item) +
-          "</li>"
-        );
+        return '<li class="card">' + cardMarkup(item) + "</li>";
       })
       .join("");
   }
@@ -407,7 +305,6 @@
         });
         updateSubtitle();
         renderGrid();
-        return hydratePosters(state.items);
       })
       .catch(function (err) {
         console.error(err);

@@ -10,8 +10,9 @@ files — perfect for GitHub Pages.
 - **Filters:** All / Movies / Series / Anime (anime = items tagged with Trakt's
   `anime` genre, since Trakt has no separate anime type).
 - **Sorted by date added** to the watchlist, newest first.
-- **Posters + details** via TMDB (optional), each linking to its Trakt page.
-- Quick title search, responsive layout, dark theme, poster caching.
+- **Posters + details straight from Trakt** (no extra API key), each linking to
+  its Trakt page.
+- Quick title search, responsive layout, dark theme.
 
 ## Setup
 
@@ -26,33 +27,25 @@ files — perfect for GitHub Pages.
 Trakt → **Settings → Privacy** → set your profile/watchlist to public.
 Otherwise the API returns "private" and visitors can't see it.
 
-### 3. (Optional) Get a TMDB key for posters
-
-1. Create a free account at <https://www.themoviedb.org/>.
-2. Go to **Settings → API** and copy either the **API Read Access Token**
-   (v4 bearer) or the **API Key** (v3). Either works.
-
-If you skip this, the page still shows titles, years, genres and Trakt links —
-just without poster images.
-
-### 4. Fill in `config.js`
+### 3. Fill in `config.js`
 
 ```js
 window.CONFIG = {
   TRAKT_USERNAME: "your-trakt-username",
   TRAKT_CLIENT_ID: "your-trakt-client-id",
-  TMDB_API_KEY: "your-tmdb-key-or-empty",
 };
 ```
 
-Commit and push.
+Commit and push. Posters are pulled directly from Trakt — no other key needed.
 
-### 5. Enable GitHub Pages
+### 4. GitHub Pages
 
-In the repo on GitHub: **Settings → Pages → Build and deployment**,
-set **Source: Deploy from a branch**, branch `claude/public-trakt-watchlist-ydhlmx`
-(or `main` once merged), folder `/ (root)`. Your site will be published at
-`https://<username>.github.io/trakt-watchlist/`.
+A workflow at `.github/workflows/pages.yml` deploys the site to GitHub Pages on
+every push to `main` (it enables Pages automatically the first time it runs).
+Your site is published at `https://<username>.github.io/trakt-watchlist/`.
+
+If you'd rather not use Actions, you can instead go to
+**Settings → Pages → Deploy from a branch**, choose `main` / `/ (root)`.
 
 ## Running locally
 
@@ -67,10 +60,9 @@ python3 -m http.server 8000
 
 - `config.js` — your settings (the only file you edit).
 - `index.html` — markup, filter tabs, search box.
-- `app.js` — fetches `GET /users/<user>/watchlist?extended=full` from Trakt
-  (paginated), sorts by `listed_at`, and renders cards. If a TMDB key is set, it
-  looks up each item's `poster_path` by its TMDB id and caches the result in
-  `localStorage` for a week.
+- `app.js` — fetches `GET /users/<user>/watchlist?extended=full,images` from
+  Trakt (paginated), sorts by `listed_at`, and renders cards using the poster
+  URLs Trakt returns inline.
 - `styles.css` — dark, responsive card grid.
 
 No build step, no backend, no secrets required at runtime.

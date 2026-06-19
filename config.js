@@ -10,11 +10,7 @@
 //    (any name; redirect URI: urn:ietf:wg:oauth:2.0:oob) and copy the
 //    "Client ID". This is a read-only public key, safe to commit.
 //
-// 3. TMDB_API_KEY (optional)
-//    Used only to show poster images. Get a free key at
-//    https://www.themoviedb.org/settings/api (the "API Read Access Token"
-//    v4 bearer token OR the v3 "API Key" both work). Leave as "" to disable
-//    posters — everything else still works.
+// Posters come straight from Trakt — no other API key needed.
 //
 // IMPORTANT: your Trakt watchlist must be set to public so visitors who are
 // not logged in can see it. Set it under Trakt → Settings → Privacy.
@@ -23,5 +19,4 @@
 window.CONFIG = {
   TRAKT_USERNAME: "dzeremi",
   TRAKT_CLIENT_ID: "bd4ee4d974c1421a548413339a9588316b1c41f5a4ad678c7d7fb46f95bd5a7b",
-  TMDB_API_KEY: "",
 };
