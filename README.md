@@ -12,7 +12,10 @@ files — perfect for GitHub Pages.
 - **Sorted by date added** to the watchlist, newest first.
 - **Posters + details straight from Trakt** (no extra API key), each linking to
   its Trakt page.
-- Quick title search, responsive layout, dark theme.
+- Quick title search, **grid/list views**, responsive layout, dark theme.
+- **Favorites (optional, needs Supabase):** you (admin) pin favorites that float
+  to the top for everyone; any visitor can mark their own favorites; you can
+  filter by a device's picks and name/delete devices.
 
 ## Setup
 
@@ -47,6 +50,47 @@ then **Save**. After a minute the site is live at
 
 Every later push to `main` redeploys automatically — no further setup needed.
 
+### 5. (Optional) Favorites + devices via Supabase
+
+This adds shared favorites. It's entirely optional — leave the Supabase fields
+in `config.js` empty and the site works exactly as before.
+
+1. Create a free project at <https://supabase.com>.
+2. Open **SQL Editor → New query**, paste the contents of
+   [`supabase/schema.sql`](supabase/schema.sql), and run it.
+3. In **Project Settings → API**, copy the **Project URL** and the **anon
+   public** key into `config.js`:
+
+   ```js
+   SUPABASE_URL: "https://xxxx.supabase.co",
+   SUPABASE_ANON_KEY: "eyJ...",   // the public "anon" key
+   ```
+
+   Both are safe to commit — all access is enforced by the SQL functions.
+4. Commit, push, open the site, then click **⚙ Device** to see this device's id.
+5. Make that device an admin (one time) in the Supabase SQL editor:
+
+   ```sql
+   update public.devices set is_admin = true, name = 'My phone'
+   where id = '<the device id from step 4>';
+   ```
+
+   Reload — you now have the admin tools. Promote/name/delete other devices
+   from **⚙ Device** afterwards; no more dashboard edits needed.
+
+#### How the favorites model works
+
+- Every browser gets a random **device id** (stored locally). Visitors never log
+  in. A device is **admin** only if its `is_admin` flag is `true` in the database.
+- **Admin favorites are pinned to the top for everyone** (shown with a ★ "Pick"
+  badge). Each visitor's own favorites float to the top **for them only**.
+- Only an admin can list devices or view another device's picks. This is enforced
+  server-side: Row Level Security blocks all direct table access, so every read
+  and write goes through `SECURITY DEFINER` functions that check admin rights.
+- A device id therefore acts as a private capability — it's a random UUID that
+  only lives in your browser and is only sent to Supabase over HTTPS. If one ever
+  leaks, just delete that device (it cascades its favorites).
+
 ## Running locally
 
 Because browsers block `fetch` from `file://`, serve the folder over HTTP:
@@ -59,13 +103,16 @@ python3 -m http.server 8000
 ## How it works
 
 - `config.js` — your settings (the only file you edit).
-- `index.html` — markup, filter tabs, search box.
+- `index.html` — markup, filter tabs, search box, view toggle, admin panel.
 - `app.js` — fetches `GET /users/<user>/watchlist?extended=full,images` from
   Trakt (paginated), sorts by `listed_at`, and renders cards using the poster
-  URLs Trakt returns inline.
+  URLs Trakt returns inline. Handles favorites, ordering and the admin panel.
+- `store.js` — thin client for the Supabase RPC functions (favorites/devices).
+- `supabase/schema.sql` — the database schema + access-control functions.
 - `styles.css` — dark, responsive card grid.
 
-No build step, no backend, no secrets required at runtime.
+No build step. The base watchlist needs no backend; favorites are an opt-in
+Supabase layer.
 
 ## Notes
 

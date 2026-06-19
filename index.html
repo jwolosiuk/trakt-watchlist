@@ -19,7 +19,7 @@
       css.rel = "stylesheet";
       css.href = "styles.css?v=" + v;
       document.head.appendChild(css);
-      ["config.js", "app.js"].forEach(function (src) {
+      ["config.js", "store.js", "app.js"].forEach(function (src) {
         var s = document.createElement("script");
         s.src = src + "?v=" + v;
         s.async = false; // preserve config.js -> app.js execution order
@@ -53,6 +53,8 @@
         aria-label="Search titles"
         autocomplete="off"
       />
+      <button class="pill-btn" id="fav-filter" type="button" hidden aria-pressed="false" title="Show only my favorites">♥ Mine</button>
+      <button class="pill-btn" id="admin-btn" type="button" hidden title="Your device & admin tools">⚙ Device</button>
       <div class="views" id="views" role="group" aria-label="View mode">
         <button class="view is-active" data-view="grid" aria-label="Grid view" aria-pressed="true" title="Grid view">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
@@ -65,9 +67,26 @@
   </nav>
 
   <main>
+    <div id="filter-banner" class="filter-banner" hidden>
+      <span id="filter-banner-text"></span>
+      <button id="filter-banner-clear" type="button">Clear</button>
+    </div>
     <div id="status" class="status" role="status"></div>
     <ul id="grid" class="grid" aria-live="polite"></ul>
   </main>
+
+  <!-- Admin panel (shown only to admin devices) -->
+  <div id="admin-panel" class="admin-panel" hidden role="dialog" aria-modal="true" aria-labelledby="admin-title">
+    <div class="admin-card">
+      <div class="admin-head">
+        <h2 id="admin-title">Devices</h2>
+        <button id="admin-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="admin-hint" id="admin-this-device"></p>
+      <div id="admin-devices" class="admin-devices"></div>
+    </div>
+    <div class="admin-backdrop" id="admin-backdrop"></div>
+  </div>
 
   <footer class="site-footer">
     <p>

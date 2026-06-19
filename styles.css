@@ -165,6 +165,7 @@ a { color: inherit; }
 }
 
 .card {
+  position: relative;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -320,3 +321,189 @@ a { color: inherit; }
     animation: none;
   }
 }
+
+/* Toolbar pill buttons (favorites filter / admin) ------------------------- */
+.pill-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pill-btn:hover { color: var(--text); border-color: #3a3f4d; }
+.pill-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Favorite (heart) button on cards ---------------------------------------- */
+.fav-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: transform 0.12s, background 0.15s, color 0.15s, opacity 0.15s;
+}
+.fav-btn:hover { opacity: 1; transform: scale(1.12); }
+.fav-btn.is-fav { color: var(--accent); background: rgba(0, 0, 0, 0.75); }
+.fav-btn[disabled] { opacity: 0.5; cursor: default; }
+
+/* "Pick" pin badge (admin favorite, visible to everyone) */
+.badge.pin { background: #f5c518; color: #1a1a1a; }
+.kind-pin { color: #f5c518; }
+
+.grid.as-list .fav-btn { top: 50%; transform: translateY(-50%); right: 10px; }
+.grid.as-list .fav-btn:hover { transform: translateY(-50%) scale(1.12); }
+
+/* Filter banner (admin viewing a device's picks) -------------------------- */
+.filter-banner {
+  max-width: 1100px;
+  margin: 16px auto 0;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.filter-banner button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.filter-banner button:hover { border-color: var(--accent); }
+
+/* Admin panel ------------------------------------------------------------- */
+body.modal-open { overflow: hidden; }
+.admin-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5vh 16px;
+}
+.admin-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: -1;
+}
+.admin-card {
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+}
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.admin-head h2 { margin: 0; font-size: 1.2rem; }
+.icon-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.icon-btn:hover { color: var(--text); }
+.admin-hint {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin: 4px 0 16px;
+  word-break: break-all;
+}
+.admin-hint code {
+  background: var(--bg-elev-2);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.95em;
+}
+.admin-note { display: inline-block; margin-top: 8px; line-height: 1.5; }
+.admin-loading, .admin-error { color: var(--text-dim); font-size: 0.9rem; }
+.admin-error { color: #ffb4b4; }
+
+.device-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.device-name { font-weight: 600; font-size: 0.95rem; }
+.device-meta {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 2px;
+}
+.device-tag {
+  display: inline-block;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
+  vertical-align: middle;
+}
+.device-tag.me { background: var(--bg-elev-2); color: var(--text-dim); }
+.device-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.device-actions button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.device-actions button:hover { border-color: var(--accent); }
+.device-actions button.danger:hover { border-color: #ff6b6b; color: #ff9b9b; }
+.device-actions button[disabled] { opacity: 0.5; cursor: default; }

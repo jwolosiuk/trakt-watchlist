@@ -17,15 +17,31 @@
     views: document.getElementById("views"),
     profileLink: document.getElementById("trakt-profile-link"),
     version: document.getElementById("version"),
+    favFilter: document.getElementById("fav-filter"),
+    adminBtn: document.getElementById("admin-btn"),
+    adminPanel: document.getElementById("admin-panel"),
+    adminClose: document.getElementById("admin-close"),
+    adminBackdrop: document.getElementById("admin-backdrop"),
+    adminDevices: document.getElementById("admin-devices"),
+    adminThisDevice: document.getElementById("admin-this-device"),
+    banner: document.getElementById("filter-banner"),
+    bannerText: document.getElementById("filter-banner-text"),
+    bannerClear: document.getElementById("filter-banner-clear"),
   };
 
+  var Store = window.Store || { enabled: false };
   var VIEW_KEY = "trakt-wl-view";
 
   var state = {
     items: [],        // normalized watchlist items
+    byKey: {},        // "type:id" -> item
     filter: "all",    // all | movies | series | anime
     query: "",
     view: readView(), // grid | list
+    myFavs: {},       // "type:id" -> true (this device's favorites)
+    adminFavs: {},    // "type:id" -> true (admin pins, shown for everyone)
+    // Favorites filter: null | "mine" | { deviceId, name, favs }
+    favView: null,
   };
 
   function readView() {
@@ -53,6 +69,10 @@
 
   function isAnime(item) {
     return (item.genres || []).indexOf("anime") !== -1;
+  }
+
+  function keyOf(item) {
+    return item.type + ":" + item.traktId;
   }
 
   // Trakt returns protocol-relative-ish paths like "media.trakt.tv/.../x.webp".
@@ -140,6 +160,8 @@
     var slugType = type === "movie" ? "movies" : "shows";
     return {
       type: type, // "movie" | "show"
+      traktId: ids.trakt || null,
+      slug: ids.slug || null,
       listedAt: row.listed_at || media.released || "",
       title: media.title || "Untitled",
       year: media.year || null,
@@ -166,15 +188,48 @@
     return item.title.toLowerCase().indexOf(state.query) !== -1;
   }
 
+  // Which favorites-set (if any) the current favView restricts the list to.
+  function favViewSet() {
+    if (state.favView === "mine") return state.myFavs;
+    if (state.favView && state.favView.favs) return state.favView.favs;
+    return null;
+  }
+
   function visibleItems() {
-    return state.items.filter(function (it) {
-      return matchesFilter(it) && matchesQuery(it);
+    var favSet = favViewSet();
+    var items = state.items.filter(function (it) {
+      if (!matchesFilter(it) || !matchesQuery(it)) return false;
+      if (favSet && !favSet[keyOf(it)]) return false;
+      return true;
     });
+
+    // Pin admin favorites first, then this device's own favorites, then the
+    // rest — each group keeps the date-added order. Skip when already viewing a
+    // single favorites set (the list is small and self-explanatory then).
+    if (!favSet) {
+      items.sort(function (a, b) {
+        return rank(a) - rank(b);
+      });
+    }
+    return items;
+  }
+
+  // Lower rank floats to the top. Stable date order is preserved within a rank
+  // because Array.sort is stable and state.items is pre-sorted by date.
+  function rank(item) {
+    var k = keyOf(item);
+    if (state.adminFavs[k]) return 0;
+    if (state.myFavs[k]) return 1;
+    return 2;
   }
 
   function cardMarkup(item) {
+    var k = keyOf(item);
     var kindLabel = item.type === "movie" ? "Movie" : "Series";
+    var pinned = Store.enabled && state.adminFavs[k];
+    var mine = Store.enabled && state.myFavs[k];
     var badges = "";
+    if (pinned) badges += '<span class="badge pin" title="Pick">★</span>';
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
     var posterInner = item.poster
@@ -187,7 +242,22 @@
       })
       .join(" · ");
 
+    // Favorite toggle (only when the backend is configured). Sits outside the
+    // poster link so clicking it doesn't open Trakt.
+    var favBtn = Store.enabled && item.traktId
+      ? '<button class="fav-btn' +
+        (mine ? " is-fav" : "") +
+        '" type="button" data-key="' +
+        escapeHtml(k) +
+        '" aria-pressed="' +
+        (mine ? "true" : "false") +
+        '" title="' +
+        (mine ? "Remove from my favorites" : "Add to my favorites") +
+        '" aria-label="Favorite">♥</button>'
+      : "";
+
     return (
+      favBtn +
       '<a class="poster-link" href="' +
       escapeHtml(item.traktUrl) +
       '" target="_blank" rel="noopener" title="' +
@@ -200,6 +270,7 @@
       '<div class="card-body">' +
       // Shown only in list view (badges cover this in grid view).
       '<div class="card-kind">' +
+      (pinned ? '<span class="kind-pin">★</span> ' : "") +
       (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
       kindLabel +
       "</div>" +
@@ -306,6 +377,286 @@
         applyView();
       });
     }
+
+    // Favorite toggle (event-delegated on the grid).
+    els.grid.addEventListener("click", function (e) {
+      var btn = e.target.closest(".fav-btn");
+      if (!btn) return;
+      e.preventDefault();
+      toggleFavorite(btn.getAttribute("data-key"), btn);
+    });
+
+    // "♥ Mine" filter.
+    if (els.favFilter) {
+      els.favFilter.addEventListener("click", function () {
+        setFavView(state.favView === "mine" ? null : "mine");
+      });
+    }
+
+    // Admin panel open/close.
+    if (els.adminBtn) {
+      els.adminBtn.addEventListener("click", openAdmin);
+    }
+    if (els.adminClose) els.adminClose.addEventListener("click", closeAdmin);
+    if (els.adminBackdrop) els.adminBackdrop.addEventListener("click", closeAdmin);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && els.adminPanel && !els.adminPanel.hidden) closeAdmin();
+    });
+
+    // Admin device-row actions (event-delegated).
+    if (els.adminDevices) {
+      els.adminDevices.addEventListener("click", onAdminAction);
+    }
+
+    if (els.bannerClear) {
+      els.bannerClear.addEventListener("click", function () {
+        setFavView(null);
+      });
+    }
+  }
+
+  // --- Favorites ----------------------------------------------------------
+
+  function toggleFavorite(k, btn) {
+    if (!Store.enabled || !k) return;
+    var item = state.byKey[k];
+    if (!item) return;
+    var on = !state.myFavs[k];
+    // Optimistic update.
+    if (on) state.myFavs[k] = true;
+    else delete state.myFavs[k];
+    if (btn) btn.disabled = true;
+    Store.setFavorite(item, on)
+      .then(function () {
+        // If this device is an admin, its picks are the public pins too.
+        if (Store.isAdmin) {
+          if (on) state.adminFavs[k] = true;
+          else delete state.adminFavs[k];
+        }
+      })
+      .catch(function (err) {
+        console.error("setFavorite failed:", err);
+        // Roll back.
+        if (on) delete state.myFavs[k];
+        else state.myFavs[k] = true;
+        alert("Couldn't save that favorite — please try again.");
+      })
+      .then(function () {
+        renderGrid();
+      });
+  }
+
+  function setFavView(view) {
+    state.favView = view;
+    if (els.favFilter) {
+      var mineActive = view === "mine";
+      els.favFilter.classList.toggle("is-active", mineActive);
+      els.favFilter.setAttribute("aria-pressed", mineActive ? "true" : "false");
+    }
+    renderBanner();
+    renderGrid();
+  }
+
+  function renderBanner() {
+    if (!els.banner) return;
+    var fv = state.favView;
+    if (fv && fv.deviceId) {
+      els.bannerText.textContent = "Showing favorites of " + (fv.name || shortId(fv.deviceId));
+      els.banner.hidden = false;
+    } else {
+      els.banner.hidden = true;
+    }
+  }
+
+  // --- Admin panel --------------------------------------------------------
+
+  function shortId(id) {
+    return (id || "").slice(0, 8);
+  }
+
+  function relTime(iso) {
+    if (!iso) return "";
+    var diff = Date.now() - new Date(iso).getTime();
+    var mins = Math.round(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + "m ago";
+    var hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + "h ago";
+    var days = Math.round(hrs / 24);
+    if (days < 30) return days + "d ago";
+    return new Date(iso).toLocaleDateString();
+  }
+
+  function favsFromRows(rows) {
+    var s = {};
+    (rows || []).forEach(function (r) {
+      s[Store.key(r.media_type, r.trakt_id)] = true;
+    });
+    return s;
+  }
+
+  function setupBackendUI() {
+    if (!Store.enabled) return;
+    if (els.favFilter) els.favFilter.hidden = false;
+    if (els.adminBtn) els.adminBtn.hidden = false;
+  }
+
+  function loadFavorites() {
+    if (!Store.enabled) return Promise.resolve();
+    return Promise.all([Store.myFavorites(), Store.adminFavorites()]).then(
+      function (res) {
+        state.myFavs = res[0] || {};
+        state.adminFavs = res[1] || {};
+        renderGrid();
+      }
+    );
+  }
+
+  function reloadAdminFavs() {
+    return Store.adminFavorites().then(function (s) {
+      state.adminFavs = s || {};
+      renderGrid();
+    });
+  }
+
+  function openAdmin() {
+    if (!Store.enabled) return;
+    els.adminPanel.hidden = false;
+    document.body.classList.add("modal-open");
+    var idHtml = "This device: <code>" + escapeHtml(Store.deviceId) + "</code>";
+    if (Store.isAdmin) {
+      els.adminThisDevice.innerHTML = idHtml + " · <strong>admin</strong>";
+      els.adminDevices.innerHTML = '<p class="admin-loading">Loading devices…</p>';
+      loadAdminDevices();
+    } else {
+      els.adminThisDevice.innerHTML =
+        idHtml +
+        '<br><span class="admin-note">To manage devices and pin favorites for ' +
+        "everyone, make this device an admin: in the Supabase SQL editor run " +
+        "<code>update devices set is_admin=true where id='" +
+        escapeHtml(Store.deviceId) +
+        "';</code></span>";
+      els.adminDevices.innerHTML = "";
+    }
+  }
+
+  function closeAdmin() {
+    if (!els.adminPanel) return;
+    els.adminPanel.hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  function loadAdminDevices() {
+    Store.admin
+      .listDevices()
+      .then(renderAdminDevices)
+      .catch(function (err) {
+        console.error(err);
+        els.adminDevices.innerHTML =
+          '<p class="admin-error">Couldn’t load devices. Are you still an admin?</p>';
+      });
+  }
+
+  function renderAdminDevices(devices) {
+    if (!devices || !devices.length) {
+      els.adminDevices.innerHTML = '<p class="admin-loading">No devices yet.</p>';
+      return;
+    }
+    els.adminDevices.innerHTML = devices
+      .map(function (d) {
+        var isMe = d.id === Store.deviceId;
+        var name = d.name || "(unnamed)";
+        var meta =
+          shortId(d.id) +
+          " · " +
+          (d.fav_count || 0) +
+          " favs · seen " +
+          relTime(d.last_seen);
+        return (
+          '<div class="device-row">' +
+          '<div class="device-info">' +
+          '<div class="device-name">' +
+          escapeHtml(name) +
+          (d.is_admin ? ' <span class="device-tag">admin</span>' : "") +
+          (isMe ? ' <span class="device-tag me">this device</span>' : "") +
+          "</div>" +
+          '<div class="device-meta">' + escapeHtml(meta) + "</div>" +
+          "</div>" +
+          '<div class="device-actions">' +
+          '<button type="button" data-action="view" data-id="' + escapeHtml(d.id) +
+          '" data-name="' + escapeHtml(name) + '">Picks</button>' +
+          '<button type="button" data-action="rename" data-id="' + escapeHtml(d.id) +
+          '" data-name="' + escapeHtml(d.name || "") + '">Rename</button>' +
+          '<button type="button" data-action="admin" data-id="' + escapeHtml(d.id) +
+          '" data-isadmin="' + (d.is_admin ? "true" : "false") + '">' +
+          (d.is_admin ? "Revoke admin" : "Make admin") +
+          "</button>" +
+          '<button type="button" class="danger" data-action="delete" data-id="' +
+          escapeHtml(d.id) + '">Delete</button>' +
+          "</div>" +
+          "</div>"
+        );
+      })
+      .join("");
+  }
+
+  function onAdminAction(e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var action = btn.getAttribute("data-action");
+    var id = btn.getAttribute("data-id");
+    var name = btn.getAttribute("data-name") || "";
+
+    if (action === "view") {
+      btn.disabled = true;
+      Store.admin
+        .deviceFavorites(id)
+        .then(function (rows) {
+          state.favView = { deviceId: id, name: name, favs: favsFromRows(rows) };
+          if (els.favFilter) {
+            els.favFilter.classList.remove("is-active");
+            els.favFilter.setAttribute("aria-pressed", "false");
+          }
+          renderBanner();
+          renderGrid();
+          closeAdmin();
+        })
+        .catch(function (err) {
+          console.error(err);
+          alert("Couldn’t load that device’s favorites.");
+        })
+        .then(function () {
+          btn.disabled = false;
+        });
+    } else if (action === "rename") {
+      var nn = prompt("Name for this device:", name);
+      if (nn === null) return;
+      Store.admin.rename(id, nn).then(loadAdminDevices).catch(adminErr);
+    } else if (action === "admin") {
+      var makeAdmin = btn.getAttribute("data-isadmin") !== "true";
+      Store.admin
+        .setAdmin(id, makeAdmin)
+        .then(function () {
+          loadAdminDevices();
+          reloadAdminFavs();
+        })
+        .catch(adminErr);
+    } else if (action === "delete") {
+      if (!confirm("Delete this device and all its favorites?")) return;
+      Store.admin
+        .remove(id)
+        .then(function () {
+          if (state.favView && state.favView.deviceId === id) setFavView(null);
+          loadAdminDevices();
+          reloadAdminFavs();
+        })
+        .catch(adminErr);
+    }
+  }
+
+  function adminErr(err) {
+    console.error(err);
+    alert("That action failed: " + (err && err.message ? err.message : "unknown error"));
   }
 
   // --- Build / commit info -----------------------------------------------
@@ -389,6 +740,11 @@
     els.subtitle.textContent = "Loading…";
     renderSkeletons(12);
 
+    // Register the device / detect admin in parallel with the watchlist fetch.
+    var backendReady = Store.enabled
+      ? Store.init().then(setupBackendUI)
+      : Promise.resolve();
+
     fetchWatchlist()
       .then(function (rows) {
         state.items = rows.map(normalize).filter(function (it) {
@@ -398,8 +754,14 @@
         state.items.sort(function (a, b) {
           return (b.listedAt || "").localeCompare(a.listedAt || "");
         });
+        state.byKey = {};
+        state.items.forEach(function (it) {
+          state.byKey[keyOf(it)] = it;
+        });
         updateSubtitle();
         renderGrid();
+        // Overlay favorites once both the list and device are ready.
+        return backendReady.then(loadFavorites);
       })
       .catch(function (err) {
         console.error(err);

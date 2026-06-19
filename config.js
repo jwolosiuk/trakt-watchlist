@@ -23,4 +23,12 @@ window.CONFIG = {
   // Optional: "owner/repo" used to show the latest commit hash + time in the
   // header. Leave empty to auto-detect from a *.github.io URL.
   GITHUB_REPO: "jwolosiuk/trakt-watchlist",
+
+  // Optional: Supabase project, used for the favorites + device features.
+  // Create a free project at https://supabase.com, run supabase/schema.sql in
+  // its SQL editor, then paste the project URL and the public "anon" key here
+  // (Project Settings → API). Both are safe to expose publicly; access is
+  // enforced by the SQL functions. Leave empty to disable favorites entirely.
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
 };
