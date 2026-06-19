@@ -160,8 +160,10 @@
   }
 
   function cardMarkup(item) {
-    var typeLabel = isAnime(item) ? "Anime" : item.type === "movie" ? "Movie" : "Series";
-    var badgeClass = isAnime(item) ? "badge anime" : "badge";
+    var kindLabel = item.type === "movie" ? "Movie" : "Series";
+    var badges = "";
+    if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
+    badges += '<span class="badge">' + kindLabel + "</span>";
     var posterInner = item.poster
       ? '<img src="' + escapeHtml(item.poster) + '" alt="" loading="lazy" />'
       : '<span class="placeholder">' + escapeHtml(item.title) + "</span>";
@@ -179,7 +181,7 @@
       escapeHtml(item.title) +
       ' on Trakt">' +
       '<div class="poster">' +
-      '<span class="' + badgeClass + '">' + typeLabel + "</span>" +
+      '<div class="badges">' + badges + "</div>" +
       posterInner +
       "</div>" +
       '<div class="card-body">' +
