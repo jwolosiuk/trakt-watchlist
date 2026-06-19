@@ -75,6 +75,12 @@
     return (item.genres || []).indexOf("anime") !== -1;
   }
 
+  // Western/non-anime animation ("bajki"): animation genre, but not anime.
+  function isAnimated(item) {
+    var g = item.genres || [];
+    return g.indexOf("animation") !== -1 && g.indexOf("anime") === -1;
+  }
+
   function keyOf(item) {
     return item.type + ":" + item.traktId;
   }
@@ -184,6 +190,7 @@
     if (state.filter === "movies") return item.type === "movie";
     if (state.filter === "series") return item.type === "show";
     if (state.filter === "anime") return isAnime(item);
+    if (state.filter === "animated") return isAnimated(item);
     return true;
   }
 
@@ -243,6 +250,7 @@
     var badges = "";
     if (pinned) badges += '<span class="badge pin" title="Pick">★</span>';
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
+    else if (isAnimated(item)) badges += '<span class="badge animated">Animated</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
     var posterInner = item.poster
       ? '<img src="' + escapeHtml(item.poster) + '" alt="" loading="lazy" />'
@@ -296,6 +304,7 @@
       '<div class="card-kind">' +
       (pinned ? '<span class="kind-pin">★</span> ' : "") +
       (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
+      (isAnimated(item) ? '<span class="kind-animated">Animated</span> · ' : "") +
       kindLabel +
       "</div>" +
       '<div class="card-title">' + escapeHtml(item.title) + "</div>" +
@@ -381,11 +390,12 @@
   }
 
   function updateSubtitle() {
-    var m = 0, s = 0, a = 0;
+    var m = 0, s = 0, a = 0, an = 0;
     state.items.forEach(function (it) {
       if (it.type === "movie") m++;
       else s++;
       if (isAnime(it)) a++;
+      if (isAnimated(it)) an++;
     });
     els.subtitle.textContent =
       state.items.length +
@@ -394,7 +404,8 @@
       " movies · " +
       s +
       " series" +
-      (a ? " · " + a + " anime" : "");
+      (a ? " · " + a + " anime" : "") +
+      (an ? " · " + an + " animated" : "");
   }
 
   // --- Events -------------------------------------------------------------
