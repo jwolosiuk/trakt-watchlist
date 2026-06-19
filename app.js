@@ -85,6 +85,34 @@
     return item.type + ":" + item.traktId;
   }
 
+  function fmtRuntime(min) {
+    if (!min) return "";
+    var h = Math.floor(min / 60), m = min % 60;
+    return h ? h + "h" + (m ? " " + m + "m" : "") : m + "m";
+  }
+
+  var STATUS_LABEL = {
+    "returning series": "Returning",
+    continuing: "Returning",
+    "in production": "Upcoming",
+    planned: "Upcoming",
+    upcoming: "Upcoming",
+    ended: "Ended",
+    canceled: "Canceled",
+    cancelled: "Canceled",
+  };
+
+  // Compact runtime / episode info shown on each card.
+  function infoLine(item) {
+    if (item.type === "movie") return fmtRuntime(item.runtime);
+    var parts = [];
+    if (item.episodes) parts.push(item.episodes + " ep");
+    if (item.runtime) parts.push("~" + item.runtime + "m");
+    var st = STATUS_LABEL[(item.status || "").toLowerCase()];
+    if (st) parts.push(st);
+    return parts.join(" · ");
+  }
+
   // Trakt returns protocol-relative-ish paths like "media.trakt.tv/.../x.webp".
   function fullImageUrl(arr) {
     if (!arr || !arr.length || !arr[0]) return null;
@@ -177,6 +205,9 @@
       year: media.year || null,
       genres: media.genres || [],
       overview: media.overview || "",
+      runtime: media.runtime || null,        // minutes (movie = full, show = per ep)
+      episodes: media.aired_episodes || null, // shows
+      status: media.status || "",             // shows
       poster: fullImageUrl(images.poster),
       traktUrl: ids.slug
         ? "https://trakt.tv/" + slugType + "/" + ids.slug
@@ -261,6 +292,7 @@
         return g.charAt(0).toUpperCase() + g.slice(1);
       })
       .join(" · ");
+    var info = infoLine(item);
 
     // Favorite toggle (only when the backend is configured). Sits outside the
     // poster link so clicking it doesn't open Trakt. For admins it toggles the
@@ -308,7 +340,10 @@
       kindLabel +
       "</div>" +
       '<div class="card-title">' + escapeHtml(item.title) + "</div>" +
-      '<div class="card-meta">' + (item.year || "") + "</div>" +
+      '<div class="card-meta">' +
+      (item.year || "") +
+      (info ? '<span class="card-info"> · ' + escapeHtml(info) + "</span>" : "") +
+      "</div>" +
       (genres ? '<div class="card-genres">' + escapeHtml(genres) + "</div>" : "") +
       "</div>" +
       "</a>"

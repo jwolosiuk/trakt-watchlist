@@ -246,6 +246,7 @@ a { color: inherit; }
   font-size: 0.78rem;
   color: var(--text-dim);
 }
+.card-info { color: var(--text-dim); opacity: 0.85; }
 .card-genres {
   font-size: 0.72rem;
   color: var(--text-dim);
