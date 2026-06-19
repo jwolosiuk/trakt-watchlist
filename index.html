@@ -44,14 +44,24 @@
       <button class="filter" data-filter="series" role="tab" aria-selected="false">Series</button>
       <button class="filter" data-filter="anime" role="tab" aria-selected="false">Anime</button>
     </div>
-    <input
-      type="search"
-      id="search"
-      class="search"
-      placeholder="Search titles…"
-      aria-label="Search titles"
-      autocomplete="off"
-    />
+    <div class="toolbar-right">
+      <input
+        type="search"
+        id="search"
+        class="search"
+        placeholder="Search titles…"
+        aria-label="Search titles"
+        autocomplete="off"
+      />
+      <div class="views" id="views" role="group" aria-label="View mode">
+        <button class="view is-active" data-view="grid" aria-label="Grid view" aria-pressed="true" title="Grid view">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        </button>
+        <button class="view" data-view="list" aria-label="List view" aria-pressed="false" title="List view">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1" y="2" width="3" height="3" rx="0.5"/><rect x="6" y="2.5" width="9" height="2" rx="1"/><rect x="1" y="7" width="3" height="3" rx="0.5"/><rect x="6" y="7.5" width="9" height="2" rx="1"/><rect x="1" y="12" width="3" height="3" rx="0.5"/><rect x="6" y="12.5" width="9" height="2" rx="1"/></svg>
+        </button>
+      </div>
+    </div>
   </nav>
 
   <main>

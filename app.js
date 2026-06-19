@@ -14,15 +14,27 @@
     grid: document.getElementById("grid"),
     search: document.getElementById("search"),
     filters: document.getElementById("filters"),
+    views: document.getElementById("views"),
     profileLink: document.getElementById("trakt-profile-link"),
     version: document.getElementById("version"),
   };
+
+  var VIEW_KEY = "trakt-wl-view";
 
   var state = {
     items: [],        // normalized watchlist items
     filter: "all",    // all | movies | series | anime
     query: "",
+    view: readView(), // grid | list
   };
+
+  function readView() {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "grid";
+    } catch (e) {
+      return "grid";
+    }
+  }
 
   // --- Helpers ------------------------------------------------------------
 
@@ -186,12 +198,28 @@
       posterInner +
       "</div>" +
       '<div class="card-body">' +
+      // Shown only in list view (badges cover this in grid view).
+      '<div class="card-kind">' +
+      (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
+      kindLabel +
+      "</div>" +
       '<div class="card-title">' + escapeHtml(item.title) + "</div>" +
       '<div class="card-meta">' + (item.year || "") + "</div>" +
       (genres ? '<div class="card-genres">' + escapeHtml(genres) + "</div>" : "") +
       "</div>" +
       "</a>"
     );
+  }
+
+  // Apply the current view (grid/list) to the container and toggle buttons.
+  function applyView() {
+    els.grid.classList.toggle("as-list", state.view === "list");
+    if (!els.views) return;
+    Array.prototype.forEach.call(els.views.children, function (b) {
+      var active = b.getAttribute("data-view") === state.view;
+      b.classList.toggle("is-active", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   }
 
   function renderGrid() {
@@ -264,6 +292,20 @@
         renderGrid();
       }, 120);
     });
+
+    if (els.views) {
+      els.views.addEventListener("click", function (e) {
+        var btn = e.target.closest(".view");
+        if (!btn) return;
+        state.view = btn.getAttribute("data-view") === "list" ? "list" : "grid";
+        try {
+          localStorage.setItem(VIEW_KEY, state.view);
+        } catch (err) {
+          /* storage disabled — view just won't persist */
+        }
+        applyView();
+      });
+    }
   }
 
   // --- Build / commit info -----------------------------------------------
@@ -325,6 +367,7 @@
 
   function init() {
     wireEvents();
+    applyView();
     showVersion();
 
     var missing = configError();
