@@ -318,8 +318,8 @@
         item.type === "show" && item.episodes && seen.episodes < item.episodes;
       if (inProgress) {
         var wt = "Watched " + seen.episodes + "/" + item.episodes + " episodes";
-        watchBadge = '<span class="badge watching" title="' + escapeHtml(wt) + '">▶ Watching</span>';
-        watchKind = ' · <span class="kind-watching">▶ Watching</span>';
+        watchBadge = '<span class="badge watching" title="' + escapeHtml(wt) + '">▶ Started</span>';
+        watchKind = ' · <span class="kind-watching">▶ Started</span>';
       } else {
         var label = item.type === "movie" && seen.plays > 1 ? "Seen ×" + seen.plays : "Seen";
         var st = seen.last ? "Last watched " + seen.last.slice(0, 10) : "Already watched";
