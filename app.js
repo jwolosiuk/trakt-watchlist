@@ -15,6 +15,7 @@
     search: document.getElementById("search"),
     filters: document.getElementById("filters"),
     profileLink: document.getElementById("trakt-profile-link"),
+    version: document.getElementById("version"),
   };
 
   var state = {
@@ -265,6 +266,54 @@
     });
   }
 
+  // --- Build / commit info -----------------------------------------------
+
+  // "owner/repo" — from config, or auto-detected from a *.github.io URL.
+  function repoSlug() {
+    if (CFG.GITHUB_REPO) return CFG.GITHUB_REPO;
+    var m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    if (!m) return null;
+    var seg = location.pathname.split("/").filter(Boolean)[0];
+    return m[1] + "/" + (seg || m[1] + ".github.io");
+  }
+
+  // Show the latest main commit (short hash + time) in the header.
+  function showVersion() {
+    if (!els.version) return;
+    var slug = repoSlug();
+    if (!slug) return;
+    fetch("https://api.github.com/repos/" + slug + "/commits/main", {
+      headers: { Accept: "application/vnd.github+json" },
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (data) {
+        if (!data || !data.sha) return;
+        var sha = data.sha.slice(0, 7);
+        var dateStr =
+          data.commit && data.commit.committer && data.commit.committer.date;
+        var when = "";
+        if (dateStr) {
+          when = new Date(dateStr).toLocaleString(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short",
+          });
+        }
+        var url = "https://github.com/" + slug + "/commit/" + data.sha;
+        els.version.innerHTML =
+          'build <a href="' +
+          escapeHtml(url) +
+          '" target="_blank" rel="noopener">' +
+          escapeHtml(sha) +
+          "</a>" +
+          (when ? " · " + escapeHtml(when) : "");
+      })
+      .catch(function () {
+        /* offline / rate-limited / local dev — just leave it blank */
+      });
+  }
+
   // --- Boot ---------------------------------------------------------------
 
   function configError() {
@@ -276,6 +325,7 @@
 
   function init() {
     wireEvents();
+    showVersion();
 
     var missing = configError();
     if (missing.length) {

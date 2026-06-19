@@ -7,13 +7,33 @@
   <meta name="description" content="A public view of my Trakt watchlist — no account needed." />
   <link rel="preconnect" href="https://api.trakt.tv" />
   <link rel="preconnect" href="https://media.trakt.tv" />
-  <link rel="stylesheet" href="styles.css" />
+  <noscript><link rel="stylesheet" href="styles.css" /></noscript>
+  <script>
+    // Cache-busting loader: append a freshness token to local assets so an
+    // updated styles.css / config.js / app.js is always fetched after a deploy
+    // instead of being served stale from the browser cache. (The page itself
+    // is revalidated by GitHub Pages via ETag.)
+    (function () {
+      var v = Date.now();
+      var css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "styles.css?v=" + v;
+      document.head.appendChild(css);
+      ["config.js", "app.js"].forEach(function (src) {
+        var s = document.createElement("script");
+        s.src = src + "?v=" + v;
+        s.async = false; // preserve config.js -> app.js execution order
+        document.head.appendChild(s);
+      });
+    })();
+  </script>
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
       <h1 id="title">Watchlist</h1>
       <p id="subtitle" class="subtitle">Loading…</p>
+      <p id="version" class="version"></p>
     </div>
   </header>
 
@@ -45,8 +65,5 @@
       Sorted by date added (newest first).
     </p>
   </footer>
-
-  <script src="config.js"></script>
-  <script src="app.js"></script>
 </body>
 </html>

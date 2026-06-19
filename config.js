@@ -19,4 +19,8 @@
 window.CONFIG = {
   TRAKT_USERNAME: "dzeremi",
   TRAKT_CLIENT_ID: "bd4ee4d974c1421a548413339a9588316b1c41f5a4ad678c7d7fb46f95bd5a7b",
+
+  // Optional: "owner/repo" used to show the latest commit hash + time in the
+  // header. Leave empty to auto-detect from a *.github.io URL.
+  GITHUB_REPO: "jwolosiuk/trakt-watchlist",
 };
