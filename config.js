@@ -30,6 +30,6 @@ window.CONFIG = {
   // paste the project URL and the public "anon" key here (Project Settings →
   // API). Both are safe to expose publicly; access is enforced by the SQL
   // functions. Leave empty to disable favorites entirely.
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://xfnaiudxoyonrtmnbyfi.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_CCrDOZy4WCoYSuScCRvDBA_enjVwoJ7",
 };

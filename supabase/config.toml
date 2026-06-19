@@ -6,7 +6,7 @@
 #
 # If Supabase opens its own PR adding/expanding this file, just merge it.
 
-project_id = "your-project-ref"
+project_id = "xfnaiudxoyonrtmnbyfi"
 
 [db]
 major_version = 16
