@@ -229,6 +229,7 @@ a { color: inherit; }
 }
 .badge.anime { background: var(--accent); }
 .badge.animated { background: #2a8c82; }
+.badge.seen { background: #3a7d44; }
 
 .card-body {
   padding: 10px 12px 12px;
@@ -292,6 +293,7 @@ a { color: inherit; }
 }
 .grid.as-list .card-kind .kind-anime { color: var(--accent); }
 .grid.as-list .card-kind .kind-animated { color: #3fb5a8; }
+.grid.as-list .card-kind .kind-seen { color: #5fbf6f; }
 .grid.as-list .card-genres {
   margin-top: 2px;
   white-space: normal;

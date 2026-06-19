@@ -39,6 +39,7 @@
     query: "",
     view: readView(), // grid | list
     myFavs: {},       // "type:id" -> true (this device's favorites)
+    watched: {},      // "type:id" -> { plays, last } from the owner's history
     adminFavs: {},    // "type:id" -> true (admin pins, shown for everyone)
     pickKeys: [],     // ordered "type:id" of admin pins
     pickOrder: {},    // "type:id" -> index within pickKeys
@@ -189,6 +190,31 @@
     return getPage(1);
   }
 
+  // The owner's watched history (public), used to flag rewatch candidates.
+  // Returns map "type:id" -> { plays, last }.
+  function fetchWatched() {
+    var user = encodeURIComponent(CFG.TRAKT_USERNAME);
+    function get(kind) {
+      return fetch(TRAKT_API + "/users/" + user + "/watched/" + kind, {
+        headers: traktHeaders(),
+      })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .catch(function () { return []; });
+    }
+    return Promise.all([get("movies"), get("shows")]).then(function (res) {
+      var map = {};
+      (res[0] || []).forEach(function (w) {
+        var id = w.movie && w.movie.ids && w.movie.ids.trakt;
+        if (id) map["movie:" + id] = { plays: w.plays || 0, last: w.last_watched_at || "" };
+      });
+      (res[1] || []).forEach(function (w) {
+        var id = w.show && w.show.ids && w.show.ids.trakt;
+        if (id) map["show:" + id] = { plays: w.plays || 0, last: w.last_watched_at || "" };
+      });
+      return map;
+    });
+  }
+
   // Turn a raw Trakt watchlist row into a flat item we can render.
   function normalize(row) {
     var type = row.type === "movie" ? "movie" : "show";
@@ -278,8 +304,14 @@
     var kindLabel = item.type === "movie" ? "Movie" : "Series";
     var pinned = Store.enabled && state.adminFavs[k];
     var mine = Store.enabled && state.myFavs[k];
+    var seen = state.watched[k];
     var badges = "";
     if (pinned) badges += '<span class="badge pin" title="Pick">★</span>';
+    if (seen) {
+      var seenLabel = item.type === "movie" && seen.plays > 1 ? "Seen ×" + seen.plays : "Seen";
+      var seenTitle = seen.last ? "Last watched " + seen.last.slice(0, 10) : "Already watched";
+      badges += '<span class="badge seen" title="' + escapeHtml(seenTitle) + '">✓ ' + seenLabel + "</span>";
+    }
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
     else if (isAnimated(item)) badges += '<span class="badge animated">Animated</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
@@ -335,6 +367,7 @@
       // Shown only in list view (badges cover this in grid view).
       '<div class="card-kind">' +
       (pinned ? '<span class="kind-pin">★</span> ' : "") +
+      (seen ? '<span class="kind-seen">✓ Seen' + (item.type === "movie" && seen.plays > 1 ? " ×" + seen.plays : "") + "</span> · " : "") +
       (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
       (isAnimated(item) ? '<span class="kind-animated">Animated</span> · ' : "") +
       kindLabel +
@@ -957,6 +990,14 @@
     var backendReady = Store.enabled
       ? Store.init().then(setupBackendUI)
       : Promise.resolve();
+
+    // The owner's watched history, in parallel; overlay "Seen" when it arrives.
+    fetchWatched()
+      .then(function (map) {
+        state.watched = map;
+        if (state.items.length) renderGrid();
+      })
+      .catch(function () {});
 
     fetchWatchlist()
       .then(function (rows) {
