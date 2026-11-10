@@ -427,6 +427,31 @@ a { color: inherit; }
 .drag-handle:active { cursor: grabbing; }
 .grid.as-list .drag-handle { left: auto; right: 46px; bottom: 50%; transform: translateY(50%); }
 
+/* Optional search link (CONFIG.SEARCH_LINK): under the heart in the grid, left
+   of it (and of the drag handle) in the list. */
+.ext-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  opacity: 0.85;
+  transition: transform 0.12s, background 0.15s, opacity 0.15s;
+}
+.ext-btn:hover { opacity: 1; transform: scale(1.12); background: rgba(0, 0, 0, 0.8); }
+.fav-btn ~ .ext-btn { top: 44px; }
+.grid.as-list .ext-btn { top: 50%; right: 10px; transform: translateY(-50%); }
+.grid.as-list .ext-btn:hover { transform: translateY(-50%) scale(1.12); }
+.grid.as-list .fav-btn ~ .ext-btn { top: 50%; right: 46px; }
+.grid.as-list .fav-btn ~ .drag-handle ~ .ext-btn { right: 82px; }
+
 /* Card being dragged: faded, and click-through so we can hit-test cards under it */
 .is-pick.dragging {
   opacity: 0.4;

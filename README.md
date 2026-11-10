@@ -125,6 +125,20 @@ tools/streaming.py --config config.js --out streaming.json --packages prv --labe
 - Trakt's own "watch now" endpoints aren't open to regular API apps, hence
   JustWatch. Tests: `python3 -m unittest discover -s tools`.
 
+### 7. (Optional) A search link per title
+
+Add `SEARCH_LINK` to `config.js` to get a small 🔍 button on every card that
+opens a search for that title in a new tab. `{query}` becomes the title with
+punctuation and accents stripped (plus the year for movies):
+
+```js
+SEARCH_LINK: {
+  label: "JustWatch",
+  url: "https://www.justwatch.com/th/search?q={query}",
+  ownerOnly: true,   // only for the admin, not for visitors
+},
+```
+
 ## Running locally
 
 Because browsers block `fetch` from `file://`, serve the folder over HTTP:

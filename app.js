@@ -281,6 +281,47 @@
     };
   }
 
+  // --- Search link (optional) ----------------------------------------------
+
+  // CONFIG.SEARCH_LINK = { label, url, ownerOnly } adds a small button that
+  // opens a search for the title in a new tab; "{query}" in url is replaced by
+  // the cleaned-up title (+ year for movies). ownerOnly hides it from visitors.
+  var SEARCH_ICON =
+    '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+    '<circle cx="6.8" cy="6.8" r="4.6" fill="none" stroke="currentColor" stroke-width="2"/>' +
+    '<path d="M10.4 10.4 14.2 14.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  // Letters and digits only (any script); a regex literal with \p{...} would be
+  // a syntax error for the whole file in an old browser, hence the fallback.
+  var NON_WORD = (function () {
+    try { return new RegExp("[^\\p{L}\\p{N}]+", "gu"); }
+    catch (e) { return /[^0-9A-Za-z\u00C0-\uFFFF]+/g; }
+  })();
+
+  // "JoJo's Bizarre Adventure" -> "JoJos Bizarre Adventure", "Pokémon" ->
+  // "Pokemon", "Fate/Zero" -> "Fate Zero": the way release names spell them.
+  function searchQuery(item) {
+    var t = item.title;
+    if (t.normalize) t = t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    t = t.replace(/['\u2019]/g, "").replace(NON_WORD, " ").trim();
+    return item.type === "movie" && item.year ? t + " " + item.year : t;
+  }
+
+  function searchLinkMarkup(item) {
+    var sl = CFG.SEARCH_LINK;
+    if (!sl || !sl.url) return "";
+    if (sl.ownerOnly && !Store.isAdmin) return "";
+    var q = searchQuery(item);
+    var label = sl.label || "Search";
+    var url = sl.url.replace("{query}", encodeURIComponent(q).replace(/%20/g, "+"));
+    return (
+      '<a class="ext-btn" href="' + escapeHtml(url) +
+      '" target="_blank" rel="noopener noreferrer" title="' +
+      escapeHtml("Search “" + q + "” on " + label) + '" aria-label="' +
+      escapeHtml("Search on " + label) + '">' + SEARCH_ICON + "</a>"
+    );
+  }
+
   // --- Rendering ----------------------------------------------------------
 
   var FILTER_TESTS = {
@@ -437,6 +478,7 @@
     return (
       favBtn +
       reorder +
+      searchLinkMarkup(item) +
       '<a class="poster-link" draggable="false" href="' +
       escapeHtml(item.traktUrl) +
       '" target="_blank" rel="noopener" title="' +
