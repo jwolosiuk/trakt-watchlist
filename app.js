@@ -40,6 +40,9 @@
     // Active filter tags: { tag: group }. Empty = "All". Tags in the same group
     // are OR-ed (Movies + Series), groups are AND-ed (Series + Netflix).
     filters: {},
+    // Excluded tags (double-click): { tag: true }. A title matching any of them
+    // is hidden, e.g. exclude Anime + Animated = no animation at all.
+    excluded: {},
     query: "",
     view: readView(), // grid | list
     myFavs: {},       // "type:id" -> true (this device's favorites)
@@ -288,8 +291,12 @@
     streaming: function (item) { return !!streamOf(item); },
   };
 
-  // Every group with an active tag must match at least one of its tags.
+  // No excluded tag may match; every group with an active tag must match at
+  // least one of its tags.
   function matchesFilter(item) {
+    for (var x in state.excluded) {
+      if (FILTER_TESTS[x](item)) return false;
+    }
     var groups = {};
     Object.keys(state.filters).forEach(function (tag) {
       var g = state.filters[tag];
@@ -556,24 +563,69 @@
       (st ? " · " + st + " on " + streamLabel() : "");
   }
 
+  // --- Filter tags ---------------------------------------------------------
+
+  var DOUBLE_CLICK_MS = 400;
+
+  function filterState(tag) {
+    if (state.filters[tag]) return "include";
+    if (state.excluded[tag]) return "exclude";
+    return "off";
+  }
+
+  function setFilterState(tag, group, st) {
+    delete state.filters[tag];
+    delete state.excluded[tag];
+    if (st === "include") state.filters[tag] = group;
+    if (st === "exclude") state.excluded[tag] = true;
+  }
+
+  // Reflect state.filters / state.excluded on the buttons (+ how-to tooltips).
+  function syncFilterButtons() {
+    var none = !Object.keys(state.filters).length && !Object.keys(state.excluded).length;
+    Array.prototype.forEach.call(els.filters.children, function (b) {
+      var t = b.getAttribute("data-filter");
+      var st = t === "all" ? (none ? "include" : "off") : filterState(t);
+      b.classList.toggle("is-active", st === "include");
+      b.classList.toggle("is-excluded", st === "exclude");
+      b.setAttribute("aria-pressed", st === "include" ? "true" : "false");
+      if (t === "all") return;
+      var name = b.textContent;
+      b.title =
+        st === "include" ? "Showing only " + name + " — click to clear, double-click to hide" :
+        st === "exclude" ? "Hiding " + name + " — click to show again" :
+        "Click: only " + name + " · double-click: hide " + name;
+    });
+  }
+
   // --- Events -------------------------------------------------------------
 
   function wireEvents() {
-    // Tags toggle and combine (see state.filters); "All" clears them.
+    // Tags toggle and combine (see state.filters); a double-click excludes a
+    // tag (or clears an exclusion); "All" clears everything. The double-click
+    // is detected from two clicks rather than the dblclick event, which iOS
+    // Safari doesn't fire for taps.
+    var lastTap = null; // { tag, at, prev } — the first click of a possible double
     els.filters.addEventListener("click", function (e) {
       var btn = e.target.closest(".filter");
       if (!btn) return;
       var tag = btn.getAttribute("data-filter");
-      if (tag === "all") state.filters = {};
-      else if (state.filters[tag]) delete state.filters[tag];
-      else state.filters[tag] = btn.getAttribute("data-group") || tag;
-      var none = !Object.keys(state.filters).length;
-      Array.prototype.forEach.call(els.filters.children, function (b) {
-        var t = b.getAttribute("data-filter");
-        var active = t === "all" ? none : !!state.filters[t];
-        b.classList.toggle("is-active", active);
-        b.setAttribute("aria-pressed", active ? "true" : "false");
-      });
+      if (tag === "all") {
+        state.filters = {};
+        state.excluded = {};
+        lastTap = null;
+      } else {
+        var cur = filterState(tag), next, now = Date.now();
+        if (lastTap && lastTap.tag === tag && now - lastTap.at < DOUBLE_CLICK_MS) {
+          next = lastTap.prev === "exclude" ? "off" : "exclude";
+          lastTap = null;
+        } else {
+          next = cur === "off" ? "include" : "off";
+          lastTap = { tag: tag, at: now, prev: cur };
+        }
+        setFilterState(tag, btn.getAttribute("data-group") || tag, next);
+      }
+      syncFilterButtons();
       renderGrid();
     });
 
@@ -1017,8 +1069,8 @@
     var s = state.streaming;
     if (els.streamFilter) {
       els.streamFilter.textContent = streamLabel();
-      els.streamFilter.title = "Only titles on " + s.label + " in " + countryName(s.country);
       els.streamFilter.hidden = false;
+      syncFilterButtons(); // tooltip uses the new label
     }
     if (els.streamNote) {
       var when = s.updated
@@ -1087,6 +1139,7 @@
 
   function init() {
     wireEvents();
+    syncFilterButtons();
     applyView();
     showVersion();
 

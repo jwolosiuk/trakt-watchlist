@@ -93,6 +93,18 @@ a { color: inherit; }
   color: #fff;
 }
 .filter.stream.is-active { background: #e50914; border-color: #e50914; }
+/* Double-click = exclude. No text selection on double-click, no double-tap
+   zoom on iOS (which would also swallow the second tap). */
+.filter { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.filter.is-excluded {
+  color: var(--text-dim);
+  border-style: dashed;
+  border-color: var(--accent-dim);
+  text-decoration-line: line-through;
+  -webkit-text-decoration-color: var(--accent);
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+}
 .toolbar-right {
   display: flex;
   gap: 10px;
