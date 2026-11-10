@@ -40,7 +40,7 @@
     // Active filter tags: { tag: group }. Empty = "All". Tags in the same group
     // are OR-ed (Movies + Series), groups are AND-ed (Series + Netflix).
     filters: {},
-    // Excluded tags (double-click): { tag: true }. A title matching any of them
+    // Excluded tags (second click): { tag: true }. A title matching any of them
     // is hidden, e.g. exclude Anime + Animated = no animation at all.
     excluded: {},
     query: "",
@@ -565,7 +565,7 @@
 
   // --- Filter tags ---------------------------------------------------------
 
-  var DOUBLE_CLICK_MS = 400;
+  var NEXT_STATE = { off: "include", include: "exclude", exclude: "off" };
 
   function filterState(tag) {
     if (state.filters[tag]) return "include";
@@ -592,20 +592,17 @@
       if (t === "all") return;
       var name = b.textContent;
       b.title =
-        st === "include" ? "Showing only " + name + " — click to clear, double-click to hide" :
-        st === "exclude" ? "Hiding " + name + " — click to show again" :
-        "Click: only " + name + " · double-click: hide " + name;
+        st === "include" ? "Showing only " + name + " — click to hide " + name + " instead" :
+        st === "exclude" ? "Hiding " + name + " — click to clear" :
+        "Click: only " + name + " · click again: hide " + name;
     });
   }
 
   // --- Events -------------------------------------------------------------
 
   function wireEvents() {
-    // Tags toggle and combine (see state.filters); a double-click excludes a
-    // tag (or clears an exclusion); "All" clears everything. The double-click
-    // is detected from two clicks rather than the dblclick event, which iOS
-    // Safari doesn't fire for taps.
-    var lastTap = null; // { tag, at, prev } — the first click of a possible double
+    // Each click moves a tag on: off -> include -> exclude -> off. Tags
+    // combine (see state.filters / state.excluded); "All" clears everything.
     els.filters.addEventListener("click", function (e) {
       var btn = e.target.closest(".filter");
       if (!btn) return;
@@ -613,17 +610,8 @@
       if (tag === "all") {
         state.filters = {};
         state.excluded = {};
-        lastTap = null;
       } else {
-        var cur = filterState(tag), next, now = Date.now();
-        if (lastTap && lastTap.tag === tag && now - lastTap.at < DOUBLE_CLICK_MS) {
-          next = lastTap.prev === "exclude" ? "off" : "exclude";
-          lastTap = null;
-        } else {
-          next = cur === "off" ? "include" : "off";
-          lastTap = { tag: tag, at: now, prev: cur };
-        }
-        setFilterState(tag, btn.getAttribute("data-group") || tag, next);
+        setFilterState(tag, btn.getAttribute("data-group") || tag, NEXT_STATE[filterState(tag)]);
       }
       syncFilterButtons();
       renderGrid();

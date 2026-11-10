@@ -11,8 +11,8 @@ files — perfect for GitHub Pages.
   with Trakt's `anime` genre, since Trakt has no separate anime type). Tags
   combine: within a group they widen the list (Movies + Series, Anime +
   Animated), across groups they narrow it (Series + Anime = anime series).
-  **Double-click** a tag to hide it instead (Anime + Animated both hidden = no
-  animation at all); click it again to clear.
+  Clicking a tag cycles it: **only** → **hide** → off (Anime + Animated both
+  hidden = no animation at all).
 - **Sorted by date added** to the watchlist, newest first.
 - **Posters + details straight from Trakt** (no extra API key), each linking to
   its Trakt page.
