@@ -37,7 +37,9 @@
   var state = {
     items: [],        // normalized watchlist items
     byKey: {},        // "type:id" -> item
-    filter: "all",    // all | movies | series | anime | animated | streaming
+    // Active filter tags: { tag: group }. Empty = "All". Tags in the same group
+    // are OR-ed (Movies + Series), groups are AND-ed (Series + Netflix).
+    filters: {},
     query: "",
     view: readView(), // grid | list
     myFavs: {},       // "type:id" -> true (this device's favorites)
@@ -278,13 +280,22 @@
 
   // --- Rendering ----------------------------------------------------------
 
+  var FILTER_TESTS = {
+    movies: function (item) { return item.type === "movie"; },
+    series: function (item) { return item.type === "show"; },
+    anime: isAnime,
+    animated: isAnimated,
+    streaming: function (item) { return !!streamOf(item); },
+  };
+
+  // Every group with an active tag must match at least one of its tags.
   function matchesFilter(item) {
-    if (state.filter === "movies") return item.type === "movie";
-    if (state.filter === "series") return item.type === "show";
-    if (state.filter === "anime") return isAnime(item);
-    if (state.filter === "animated") return isAnimated(item);
-    if (state.filter === "streaming") return !!streamOf(item);
-    return true;
+    var groups = {};
+    Object.keys(state.filters).forEach(function (tag) {
+      var g = state.filters[tag];
+      groups[g] = groups[g] || FILTER_TESTS[tag](item);
+    });
+    return Object.keys(groups).every(function (g) { return groups[g]; });
   }
 
   function matchesQuery(item) {
@@ -472,7 +483,7 @@
     if (!items.length) {
       els.grid.innerHTML = "";
       setStatus(
-        '<div class="card-msg">Nothing here yet for this filter.</div>',
+        '<div class="card-msg">Nothing here yet for these filters.</div>',
         false
       );
       return;
@@ -548,14 +559,20 @@
   // --- Events -------------------------------------------------------------
 
   function wireEvents() {
+    // Tags toggle and combine (see state.filters); "All" clears them.
     els.filters.addEventListener("click", function (e) {
       var btn = e.target.closest(".filter");
       if (!btn) return;
-      state.filter = btn.getAttribute("data-filter");
+      var tag = btn.getAttribute("data-filter");
+      if (tag === "all") state.filters = {};
+      else if (state.filters[tag]) delete state.filters[tag];
+      else state.filters[tag] = btn.getAttribute("data-group") || tag;
+      var none = !Object.keys(state.filters).length;
       Array.prototype.forEach.call(els.filters.children, function (b) {
-        var active = b === btn;
+        var t = b.getAttribute("data-filter");
+        var active = t === "all" ? none : !!state.filters[t];
         b.classList.toggle("is-active", active);
-        b.setAttribute("aria-selected", active ? "true" : "false");
+        b.setAttribute("aria-pressed", active ? "true" : "false");
       });
       renderGrid();
     });

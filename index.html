@@ -38,13 +38,15 @@
   </header>
 
   <nav class="toolbar">
-    <div class="filters" id="filters" role="tablist" aria-label="Filter by type">
-      <button class="filter is-active" data-filter="all" role="tab" aria-selected="true">All</button>
-      <button class="filter" data-filter="movies" role="tab" aria-selected="false">Movies</button>
-      <button class="filter" data-filter="series" role="tab" aria-selected="false">Series</button>
-      <button class="filter" data-filter="anime" role="tab" aria-selected="false">Anime</button>
-      <button class="filter" data-filter="animated" role="tab" aria-selected="false">Animated</button>
-      <button class="filter stream" id="stream-filter" data-filter="streaming" role="tab" aria-selected="false" hidden>Streaming</button>
+    <!-- Tags combine: OR within a data-group (Movies + Series), AND across
+         groups (Series + Netflix). "All" clears them. -->
+    <div class="filters" id="filters" role="group" aria-label="Filters">
+      <button class="filter is-active" data-filter="all" type="button" aria-pressed="true">All</button>
+      <button class="filter" data-filter="movies" data-group="type" type="button" aria-pressed="false">Movies</button>
+      <button class="filter" data-filter="series" data-group="type" type="button" aria-pressed="false">Series</button>
+      <button class="filter" data-filter="anime" data-group="animation" type="button" aria-pressed="false">Anime</button>
+      <button class="filter" data-filter="animated" data-group="animation" type="button" aria-pressed="false">Animated</button>
+      <button class="filter stream" id="stream-filter" data-filter="streaming" data-group="where" type="button" aria-pressed="false" hidden>Streaming</button>
     </div>
     <div class="toolbar-right">
       <input
