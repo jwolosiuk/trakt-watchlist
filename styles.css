@@ -107,13 +107,16 @@ a { color: inherit; }
 }
 .toolbar-right {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   flex: 1 1 auto;
   justify-content: flex-end;
+  min-width: 0;
 }
 .search {
   flex: 1 1 160px;
+  min-width: 0; /* an <input> won't shrink below its intrinsic width otherwise */
   max-width: 280px;
   appearance: none;
   border: 1px solid var(--border);
@@ -124,6 +127,14 @@ a { color: inherit; }
   font-size: 0.9rem;
 }
 .search:focus { outline: none; border-color: var(--accent); }
+/* Phones: search gets its own row, buttons below it, view toggle on the right.
+   Without this the row (search + Mine + Device + views) was wider than the
+   screen and the whole page scrolled sideways. */
+@media (max-width: 600px) {
+  .toolbar-right { justify-content: flex-start; }
+  .search { flex-basis: 100%; max-width: none; }
+  .views { margin-left: auto; }
+}
 
 .views {
   display: inline-flex;
@@ -451,6 +462,13 @@ a { color: inherit; }
 .grid.as-list .ext-btn:hover { transform: translateY(-50%) scale(1.12); }
 .grid.as-list .fav-btn ~ .ext-btn { top: 50%; right: 46px; }
 .grid.as-list .fav-btn ~ .drag-handle ~ .ext-btn { right: 82px; }
+/* Keep list text clear of the round buttons on the right (30px each, 6px apart,
+   10px from the edge): one button, two, or three (heart + drag + search). */
+.grid.as-list .fav-btn ~ .poster-link .card-body,
+.grid.as-list .ext-btn ~ .poster-link .card-body { padding-right: 52px; }
+.grid.as-list .fav-btn ~ .drag-handle ~ .poster-link .card-body,
+.grid.as-list .fav-btn ~ .ext-btn ~ .poster-link .card-body { padding-right: 88px; }
+.grid.as-list .fav-btn ~ .drag-handle ~ .ext-btn ~ .poster-link .card-body { padding-right: 124px; }
 
 /* Card being dragged: faded, and click-through so we can hit-test cards under it */
 .is-pick.dragging {
