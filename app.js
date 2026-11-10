@@ -379,7 +379,6 @@
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
     else if (isAnimated(item)) badges += '<span class="badge animated">Animated</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
-    badges += streamBadge;
     badges += watchBadge; // watched status goes last
     var posterInner = item.poster
       ? '<img src="' + escapeHtml(item.poster) + '" alt="" loading="lazy" />'
@@ -427,6 +426,7 @@
       ' on Trakt">' +
       '<div class="poster">' +
       '<div class="badges">' + badges + "</div>" +
+      (streamBadge ? '<div class="badges bottom">' + streamBadge + "</div>" : "") +
       posterInner.replace("<img ", '<img draggable="false" ') +
       "</div>" +
       '<div class="card-body">' +

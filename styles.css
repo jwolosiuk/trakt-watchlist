@@ -232,6 +232,9 @@ a { color: inherit; }
 .badge.animated { background: #2a8c82; }
 .badge.seen { background: #3a7d44; }
 .badge.watching { background: #c77a18; }
+/* Streaming availability sits in the bottom-left corner of the poster, away
+   from the type badges (Anime is red too) and the heart. */
+.badges.bottom { top: auto; bottom: 8px; }
 .badge.stream { background: #e50914; } /* Netflix red */
 
 .card-body {
