@@ -16,6 +16,9 @@ files — perfect for GitHub Pages.
 - **Favorites (optional, needs Supabase):** you (admin) pin favorites that float
   to the top for everyone; any visitor can mark their own favorites; you can
   filter by a device's picks and name/delete devices.
+- **Streaming availability (optional, needs a server):** a "Netflix" badge on
+  titles you can stream in one country (Thailand by default), "Netflix 1/4"
+  when only some seasons are there, plus a **Netflix TH** filter. See step 6.
 
 ## Setup
 
@@ -96,6 +99,28 @@ in `config.js` empty and the site works exactly as before.
   only lives in your browser and is only sent to Supabase over HTTPS. If one ever
   leaks, just delete that device (it cascades its favorites).
 
+### 6. (Optional) Streaming availability (e.g. Netflix in Thailand)
+
+The page looks for a `streaming.json` next to `index.html`. If it's there, it
+adds the badge, the filter button and a note in the footer; if not (plain
+GitHub Pages), nothing changes. The file is made by a stdlib-only script that
+reads your watchlist from Trakt and checks every title on
+[JustWatch](https://www.justwatch.com) (its unofficial GraphQL API, no key):
+
+```bash
+tools/streaming.py --config config.js --out streaming.json            # Netflix, Thailand
+tools/streaming.py --config config.js --out streaming.json --country US
+tools/streaming.py --config config.js --out streaming.json --packages prv --label "Prime Video"
+```
+
+- Titles are matched by **IMDb id** (then TMDB id), never by title alone, so a
+  remake or namesake can't show up as "on Netflix".
+- Only subscription / free offers count — rentals and purchases don't.
+- Netflix catalogues change daily, so run it on a schedule (cron / systemd
+  timer). A failed run leaves the previous file in place.
+- Trakt's own "watch now" endpoints aren't open to regular API apps, hence
+  JustWatch. Tests: `python3 -m unittest discover -s tools`.
+
 ## Running locally
 
 Because browsers block `fetch` from `file://`, serve the folder over HTTP:
@@ -116,6 +141,7 @@ python3 -m http.server 8000
 - `supabase/migrations/` — the database schema + access-control functions
   (deployed automatically when GitHub is connected).
 - `styles.css` — dark, responsive card grid.
+- `tools/streaming.py` — optional generator of `streaming.json` (see step 6).
 
 No build step. The base watchlist needs no backend; favorites are an opt-in
 Supabase layer.

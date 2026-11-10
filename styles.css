@@ -92,6 +92,7 @@ a { color: inherit; }
   border-color: var(--accent);
   color: #fff;
 }
+.filter.stream.is-active { background: #e50914; border-color: #e50914; }
 .toolbar-right {
   display: flex;
   gap: 10px;
@@ -231,6 +232,7 @@ a { color: inherit; }
 .badge.animated { background: #2a8c82; }
 .badge.seen { background: #3a7d44; }
 .badge.watching { background: #c77a18; }
+.badge.stream { background: #e50914; } /* Netflix red */
 
 .card-body {
   padding: 10px 12px 12px;
@@ -296,6 +298,7 @@ a { color: inherit; }
 .grid.as-list .card-kind .kind-animated { color: #3fb5a8; }
 .grid.as-list .card-kind .kind-seen { color: #5fbf6f; }
 .grid.as-list .card-kind .kind-watching { color: #e0a040; }
+.grid.as-list .card-kind .kind-stream { color: #ff5a60; }
 .grid.as-list .card-genres {
   margin-top: 2px;
   white-space: normal;

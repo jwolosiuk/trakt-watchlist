@@ -44,6 +44,7 @@
       <button class="filter" data-filter="series" role="tab" aria-selected="false">Series</button>
       <button class="filter" data-filter="anime" role="tab" aria-selected="false">Anime</button>
       <button class="filter" data-filter="animated" role="tab" aria-selected="false">Animated</button>
+      <button class="filter stream" id="stream-filter" data-filter="streaming" role="tab" aria-selected="false" hidden>Streaming</button>
     </div>
     <div class="toolbar-right">
       <input
@@ -92,7 +93,7 @@
   <footer class="site-footer">
     <p>
       Data from <a id="trakt-profile-link" href="https://trakt.tv" target="_blank" rel="noopener">Trakt</a>.
-      Sorted by date added (newest first).
+      Sorted by date added (newest first).<span id="stream-note" hidden></span>
     </p>
   </footer>
 </body>

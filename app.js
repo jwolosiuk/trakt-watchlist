@@ -14,6 +14,8 @@
     grid: document.getElementById("grid"),
     search: document.getElementById("search"),
     filters: document.getElementById("filters"),
+    streamFilter: document.getElementById("stream-filter"),
+    streamNote: document.getElementById("stream-note"),
     views: document.getElementById("views"),
     profileLink: document.getElementById("trakt-profile-link"),
     version: document.getElementById("version"),
@@ -35,7 +37,7 @@
   var state = {
     items: [],        // normalized watchlist items
     byKey: {},        // "type:id" -> item
-    filter: "all",    // all | movies | series | anime
+    filter: "all",    // all | movies | series | anime | animated | streaming
     query: "",
     view: readView(), // grid | list
     myFavs: {},       // "type:id" -> true (this device's favorites)
@@ -46,6 +48,9 @@
     dragKey: null,    // pick currently being dragged
     // Favorites filter: null | "mine" | { deviceId, name, favs }
     favView: null,
+    // Optional streaming availability from streaming.json (tools/streaming.py):
+    // { label, country, updated, items: { "type:id": { url, seasons, total_seasons } } }
+    streaming: null,
   };
 
   function readView() {
@@ -84,6 +89,31 @@
 
   function keyOf(item) {
     return item.type + ":" + item.traktId;
+  }
+
+  // Streaming entry for this item ({ url, seasons, total_seasons }) or null.
+  function streamOf(item) {
+    return (state.streaming && state.streaming.items[keyOf(item)]) || null;
+  }
+
+  // "Netflix TH" — short label for the filter button and the subtitle.
+  function streamLabel() {
+    var s = state.streaming;
+    return s.label + (s.country ? " " + s.country : "");
+  }
+
+  function countryName(code) {
+    try {
+      return new Intl.DisplayNames(["en"], { type: "region" }).of(code) || code;
+    } catch (e) {
+      return code;
+    }
+  }
+
+  // Seasons note for a show that's only partly on the service, e.g. "1 of 4 seasons".
+  function partialSeasons(entry) {
+    if (!entry.seasons || !entry.total_seasons || entry.seasons >= entry.total_seasons) return "";
+    return entry.seasons + " of " + entry.total_seasons + " seasons";
   }
 
   function fmtRuntime(min) {
@@ -253,6 +283,7 @@
     if (state.filter === "series") return item.type === "show";
     if (state.filter === "anime") return isAnime(item);
     if (state.filter === "animated") return isAnimated(item);
+    if (state.filter === "streaming") return !!streamOf(item);
     return true;
   }
 
@@ -328,11 +359,27 @@
       }
     }
 
+    // Streaming availability ("Netflix", or "Netflix 1/4" when only some
+    // seasons are there). Not a link: the whole card already links to Trakt.
+    var stream = streamOf(item), streamBadge = "", streamKind = "";
+    if (stream) {
+      var partial = partialSeasons(stream);
+      var sl = state.streaming.label;
+      var stTitle = "On " + sl + " in " + countryName(state.streaming.country) +
+        (partial ? " — " + partial : "");
+      streamBadge = '<span class="badge stream" title="' + escapeHtml(stTitle) + '">' +
+        escapeHtml(sl) + (partial ? " " + stream.seasons + "/" + stream.total_seasons : "") +
+        "</span>";
+      streamKind = ' · <span class="kind-stream" title="' + escapeHtml(stTitle) + '">' +
+        escapeHtml(sl) + (partial ? " (" + partial + ")" : "") + "</span>";
+    }
+
     var badges = "";
     if (pinned) badges += '<span class="badge pin" title="Pick">★</span>';
     if (isAnime(item)) badges += '<span class="badge anime">Anime</span>';
     else if (isAnimated(item)) badges += '<span class="badge animated">Animated</span>';
     badges += '<span class="badge">' + kindLabel + "</span>";
+    badges += streamBadge;
     badges += watchBadge; // watched status goes last
     var posterInner = item.poster
       ? '<img src="' + escapeHtml(item.poster) + '" alt="" loading="lazy" />'
@@ -389,6 +436,7 @@
       (isAnime(item) ? '<span class="kind-anime">Anime</span> · ' : "") +
       (isAnimated(item) ? '<span class="kind-animated">Animated</span> · ' : "") +
       kindLabel +
+      streamKind +
       watchKind +
       "</div>" +
       '<div class="card-title">' + escapeHtml(item.title) + "</div>" +
@@ -477,12 +525,13 @@
   }
 
   function updateSubtitle() {
-    var m = 0, s = 0, a = 0, an = 0;
+    var m = 0, s = 0, a = 0, an = 0, st = 0;
     state.items.forEach(function (it) {
       if (it.type === "movie") m++;
       else s++;
       if (isAnime(it)) a++;
       if (isAnimated(it)) an++;
+      if (streamOf(it)) st++;
     });
     els.subtitle.textContent =
       state.items.length +
@@ -492,7 +541,8 @@
       s +
       " series" +
       (a ? " · " + a + " anime" : "") +
-      (an ? " · " + an + " animated" : "");
+      (an ? " · " + an + " animated" : "") +
+      (st ? " · " + st + " on " + streamLabel() : "");
   }
 
   // --- Events -------------------------------------------------------------
@@ -927,6 +977,43 @@
   // --- Build / commit info -----------------------------------------------
 
   // "owner/repo" — from config, or auto-detected from a *.github.io URL.
+  // --- Streaming availability (optional) ---------------------------------
+
+  // streaming.json sits next to index.html and is produced server-side by
+  // tools/streaming.py (JustWatch data). No file = the feature stays hidden,
+  // so a plain GitHub Pages deploy works exactly as before. Relative URL on
+  // purpose: the page is also served under a /s/<token>/ prefix.
+  function fetchStreaming() {
+    return fetch("streaming.json?v=" + Date.now(), { cache: "no-store" })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (data) {
+        return data && data.label && data.items ? data : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function setupStreamingUI() {
+    var s = state.streaming;
+    if (els.streamFilter) {
+      els.streamFilter.textContent = streamLabel();
+      els.streamFilter.title = "Only titles on " + s.label + " in " + countryName(s.country);
+      els.streamFilter.hidden = false;
+    }
+    if (els.streamNote) {
+      var when = s.updated
+        ? new Date(s.updated).toLocaleDateString(undefined, { dateStyle: "medium" })
+        : "";
+      els.streamNote.textContent =
+        " " + s.label + " availability in " + countryName(s.country) +
+        " from " + (s.source || "JustWatch") + (when ? ", checked " + when : "") + ".";
+      els.streamNote.hidden = false;
+    }
+  }
+
   function repoSlug() {
     if (CFG.GITHUB_REPO) return CFG.GITHUB_REPO;
     var m = location.hostname.match(/^([^.]+)\.github\.io$/);
@@ -1009,6 +1096,17 @@
     var backendReady = Store.enabled
       ? Store.init().then(setupBackendUI)
       : Promise.resolve();
+
+    // Streaming availability, in parallel; overlay badges when it arrives.
+    fetchStreaming().then(function (data) {
+      if (!data) return;
+      state.streaming = data;
+      setupStreamingUI();
+      if (state.items.length) {
+        updateSubtitle();
+        renderGrid();
+      }
+    });
 
     // The owner's watched history, in parallel; overlay "Seen" when it arrives.
     fetchWatched()
